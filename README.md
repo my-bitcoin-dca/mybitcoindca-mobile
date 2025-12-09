@@ -54,63 +54,6 @@ This mobile app implements a **true privacy-first DCA and withdrawal system** fo
 └─────────────────────┘         └─────────────────────┘
 ```
 
-## Setup Instructions
-
-### Prerequisites
-- Node.js 18+
-- Yarn
-- Expo CLI (`npm install -g expo-cli`)
-- iOS Simulator (Mac) or Android Emulator
-- Physical device for push notifications (simulators don't support push)
-
-### Installation
-
-1. Navigate to mobile directory:
-```bash
-cd mobile
-```
-
-2. Install dependencies (already done via yarn):
-```bash
-yarn install
-```
-
-3. Configure API URL:
-Edit `src/utils/config.js` and update the API URLs:
-```javascript
-export const API_URL = 'http://your-server-ip:3000/api';
-export const AUTH_URL = 'http://your-server-ip:3000/api/auth';
-```
-
-### Running the App
-
-#### Development Mode
-```bash
-# Start Expo dev server
-yarn start
-
-# Run on iOS simulator (Mac only)
-yarn ios
-
-# Run on Android emulator
-yarn android
-```
-
-#### On Physical Device
-
-1. Install Expo Go app on your phone:
-   - iOS: https://apps.apple.com/app/expo-go/id982107779
-   - Android: https://play.google.com/store/apps/details?id=host.exp.exponent
-
-2. Start the dev server:
-```bash
-yarn start
-```
-
-3. Scan the QR code with:
-   - iOS: Camera app
-   - Android: Expo Go app
-
 ## User Guide
 
 ### First Time Setup
@@ -186,33 +129,6 @@ When it's time to withdraw Bitcoin to your hardware wallet:
 - Don't root/jailbreak your device
 - Only download the app from official sources
 
-## Troubleshooting
-
-### Can't Login
-- Check API URL in `src/utils/config.js`
-- Ensure server is running
-- Check network connectivity
-- Verify credentials
-
-### Push Notifications Not Working
-- Notifications only work on physical devices
-- Check notification permissions in phone settings
-- Ensure app has permission to send notifications
-- Verify Expo push token is registered on server
-
-### API Keys Not Working
-- Verify keys have spot trading + withdrawal permissions on Binance
-- Check if IP whitelisting is preventing connection
-- Test connection using "Test Connection" button
-- Ensure keys are copied correctly (no extra spaces)
-
-### App Crashes on Startup
-- Clear app data and reinstall
-- Check logs: `npx expo start --dev-client`
-- Ensure all dependencies are installed
-
-## Development
-
 ### Project Structure
 ```
 mobile/
@@ -238,39 +154,6 @@ mobile/
 ├── App.js                 # App entry point
 ├── app.json              # Expo config
 └── package.json
-```
-
-### Adding New Features
-
-1. Create screen in `src/screens/`
-2. Add navigation route in `src/navigation/AppNavigator.js`
-3. Add API calls in `src/services/api.js`
-4. Update README
-
-## Production Deployment
-
-### Building for iOS
-
-1. Configure app.json with bundle identifier
-2. Build:
-```bash
-eas build --platform ios
-```
-3. Submit to App Store:
-```bash
-eas submit --platform ios
-```
-
-### Building for Android
-
-1. Configure app.json with package name
-2. Build:
-```bash
-eas build --platform android
-```
-3. Submit to Play Store:
-```bash
-eas submit --platform android
 ```
 
 ## FAQ
