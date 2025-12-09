@@ -4,13 +4,14 @@ A React Native mobile app for secure Bitcoin withdrawal management with privacy-
 
 ## Overview
 
-This mobile app implements a **true privacy-first withdrawal system** for your DCA Bitcoin platform:
+This mobile app implements a **true privacy-first DCA and withdrawal system** for your Bitcoin platform:
 
-- **Binance** handles automated DCA purchases via recurring buy (set up by user directly)
+- **User** deposits currency to Binance (manually or via recurring deposit)
 - **Server** has NO Binance API keys and cannot access the exchange at all
 - **Mobile app** stores the ONLY copy of full-access Binance API keys securely on the device
-- **Withdrawals** require user approval via the mobile app
-- **API keys never leave the phone** - withdrawals execute directly from phone to Binance
+- **Purchases** - App notifies when to buy, user executes purchase through mobile app
+- **Withdrawals** - App notifies when to withdraw, user approves via mobile app
+- **API keys never leave the phone** - all trades and withdrawals execute directly from phone to Binance
 
 ## Key Features
 
@@ -23,31 +24,32 @@ This mobile app implements a **true privacy-first withdrawal system** for your D
 ### 📱 Core Functionality
 - **Login** - Authenticate with your DCA account
 - **API Key Management** - Store Binance API keys securely on device
+- **Purchase Notifications** - Get notified when it's time to execute DCA purchases
 - **Withdrawal Approval** - Review and approve withdrawal requests
 - **Transaction History** - View DCA purchases and withdrawals
-- **Push Notifications** - Get notified when withdrawals need approval
+- **Push Notifications** - Get notified for both purchases and withdrawals
 
 ## Architecture
 
 ```
 ┌─────────────────────┐
 │   Binance Exchange  │
-│  (Recurring Buy)    │
+│  (Holds Funds)      │
 │                     │
-│  - Auto DCA buys    │
+│  - User deposits    │
 │  - BTC accumulates  │
 └─────────────────────┘
            ↑
            │
-           │ Withdrawal Request
+           │ Buy BTC / Withdraw
            │ (Direct from Phone)
            │
 ┌─────────────────────┐         ┌─────────────────────┐
 │   Your Server       │         │   Mobile App        │
 │   (No API Keys!)    │         │   (Full Keys)       │
 │                     │         │                     │
-│  - Tracks schedule  │────────→│  - User approves    │
-│  - Sends push       │ Notify  │  - Executes directly│
+│  - Tracks schedule  │────────→│  - Execute buys     │
+│  - Sends push       │ Notify  │  - Approve withdraw │
 │  - Records history  │         │  - Keys stay local  │
 └─────────────────────┘         └─────────────────────┘
 ```
@@ -113,10 +115,10 @@ yarn start
 
 ### First Time Setup
 
-1. **Set up Binance Recurring Buy** (on Binance website)
-   - Go to Binance → Buy Crypto → Recurring Buy
-   - Set your DCA schedule (e.g., weekly €35)
-   - BTC will automatically purchase on schedule
+1. **Deposit Currency to Binance**
+   - Deposit EUR (or your preferred currency) to your Binance account
+   - You can set up recurring deposits or deposit manually
+   - Keep funds available for DCA purchases
 
 2. **Login to Mobile App**
    - Enter your DCA account credentials
@@ -129,7 +131,7 @@ yarn start
 
 4. **Configure API Keys**
    - Go to Settings → API Keys
-   - Enter your Binance API keys (with withdrawal permission)
+   - Enter your Binance API keys (with spot trading + withdrawal permissions)
    - These are stored encrypted on your device
    - Never shared with the server
 
@@ -138,28 +140,39 @@ yarn start
 1. Log in to Binance.com
 2. Go to Profile → API Management
 3. Create a new API key
-4. **Enable "Enable Withdrawals" permission** ⚠️
-5. Optionally whitelist your IP for extra security
-6. Copy API Key and Secret Key to the app
+4. **Enable "Enable Spot & Margin Trading" permission** ⚠️
+5. **Enable "Enable Withdrawals" permission** ⚠️
+6. Optionally whitelist your IP for extra security
+7. Copy API Key and Secret Key to the app
+
+### Receiving Purchase Notifications
+
+When it's time to execute your DCA purchase:
+
+1. **Push Notification** arrives on your phone ("Time to buy Bitcoin")
+2. **Tap notification** to open app
+3. **Enter passcode** to unlock
+4. **Review purchase details** and confirm
+5. **Purchase executes directly** from your phone to Binance
 
 ### Receiving Withdrawal Notifications
 
 When it's time to withdraw Bitcoin to your hardware wallet:
 
-1. **Push Notification** arrives on your phone
+1. **Push Notification** arrives on your phone ("Time to withdraw Bitcoin")
 2. **Tap notification** to open app
 3. **Enter passcode** to unlock
 4. **Review withdrawal details**:
-   - Amount in EUR and BTC
+   - Amount in BTC
    - Network fee
-   - Destination address
+   - Destination address (your hardware wallet)
 5. **Approve or Reject**
 6. **Withdrawal executes directly** from your phone to Binance
 
 ## Security Best Practices
 
 ### API Key Security
-- ✅ Use API keys with withdrawal permission
+- ✅ Use API keys with spot trading + withdrawal permissions
 - ✅ Consider IP whitelisting on Binance
 - ✅ Enable 2FA on your Binance account
 - ✅ Keep your phone OS updated
@@ -188,7 +201,7 @@ When it's time to withdraw Bitcoin to your hardware wallet:
 - Verify Expo push token is registered on server
 
 ### API Keys Not Working
-- Verify keys have withdrawal permission on Binance
+- Verify keys have spot trading + withdrawal permissions on Binance
 - Check if IP whitelisting is preventing connection
 - Test connection using "Test Connection" button
 - Ensure keys are copied correctly (no extra spaces)
@@ -268,17 +281,17 @@ A: Your Binance API keys are encrypted on the device. Immediately revoke the API
 **Q: Can I use the same API keys on multiple devices?**
 A: Yes, but for security it's better to use device-specific keys with IP whitelisting.
 
-**Q: What if I don't approve a withdrawal?**
-A: Bitcoin stays on the exchange until you approve the withdrawal. You can approve it later.
+**Q: What if I don't approve a purchase or withdrawal?**
+A: Funds stay on the exchange until you execute the action. You can do it later when convenient.
 
 **Q: How are the keys encrypted?**
 A: We use Expo SecureStore which uses iOS Keychain and Android Keystore for hardware-backed encryption.
 
-**Q: Can the server execute withdrawals without my approval?**
-A: No. The server has NO Binance API keys at all. Only your phone can access Binance and execute withdrawals.
+**Q: Can the server execute purchases or withdrawals without my approval?**
+A: No. The server has NO Binance API keys at all. Only your phone can access Binance and execute trades/withdrawals.
 
-**Q: How does the server know when to send withdrawal notifications?**
-A: You configure withdrawal schedules (e.g., weekly). The server sends notifications based on this schedule. You can also manually request withdrawals from the web dashboard.
+**Q: How does the server know when to send notifications?**
+A: You configure DCA and withdrawal schedules (e.g., weekly). The server sends notifications based on these schedules. You can also manually trigger purchases or withdrawals from the web dashboard.
 
 ## Support
 
