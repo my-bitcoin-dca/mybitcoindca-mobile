@@ -12,8 +12,10 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import { authAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '../utils/currency';
 
 const DAYS_OF_WEEK = [
   { label: 'Monday', value: 'monday' },
@@ -36,6 +38,7 @@ export default function SettingsScreen({ navigation }) {
   const [saving, setSaving] = useState(false);
 
   // Settings state
+  const [currency, setCurrency] = useState('EUR');
   const [weeklyDcaAmount, setWeeklyDcaAmount] = useState('35');
   const [exchangeTradingFee, setExchangeTradingFee] = useState('0.1');
   const [walletAddress, setWalletAddress] = useState('');
@@ -53,6 +56,7 @@ export default function SettingsScreen({ navigation }) {
 
       if (response.success) {
         const { settings } = response.data;
+        setCurrency(settings.currency || 'EUR');
         setWeeklyDcaAmount(settings.weeklyDcaAmount?.toString() || '35');
         setExchangeTradingFee(settings.exchangeTradingFee?.toString() || '0.1');
         setWalletAddress(settings.hardwareWalletAddress || '');
@@ -101,6 +105,7 @@ export default function SettingsScreen({ navigation }) {
       setSaving(true);
 
       const response = await authAPI.updateSettings({
+        currency: currency,
         weeklyDcaAmount: amount,
         exchangeTradingFee: fee,
         hardwareWalletAddress: trimmedWalletAddress,
@@ -219,14 +224,39 @@ export default function SettingsScreen({ navigation }) {
 
         <Text style={styles.sectionTitle}>DCA Settings</Text>
 
+        {/* Currency Selector */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Preferred Currency</Text>
+          <Text style={styles.description}>
+            Currency for your DCA purchases and display
+          </Text>
+          <View style={[styles.inputContainer, styles.pickerContainer]}>
+            <Picker
+              selectedValue={currency}
+              onValueChange={(itemValue) => setCurrency(itemValue)}
+              style={styles.picker}
+              dropdownIconColor={colors.text}
+            >
+              {SUPPORTED_CURRENCIES.map((curr) => (
+                <Picker.Item
+                  key={curr.code}
+                  label={`${curr.symbol} ${curr.name} (${curr.code})`}
+                  value={curr.code}
+                  color={colors.text}
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
+
         {/* Weekly DCA Amount */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Weekly DCA Amount (EUR)</Text>
+          <Text style={styles.label}>Weekly DCA Amount ({currency})</Text>
           <Text style={styles.description}>
-            Amount in EUR to purchase each week
+            Amount in {currency} to purchase each week
           </Text>
           <View style={styles.inputContainer}>
-            <Text style={styles.currencySymbol}>€</Text>
+            <Text style={styles.currencySymbol}>{getCurrencySymbol(currency)}</Text>
             <TextInput
               style={styles.input}
               value={weeklyDcaAmount}
@@ -432,6 +462,14 @@ const createStyles = (colors) => StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     backgroundColor: colors.background,
+  },
+  pickerContainer: {
+    paddingHorizontal: 0,
+  },
+  picker: {
+    flex: 1,
+    height: 48,
+    color: colors.text,
   },
   input: {
     flex: 1,

@@ -1,5 +1,6 @@
 import Binance from 'binance-api-react-native';
 import storage from '../utils/storage';
+import { getBinancePair } from '../utils/currency';
 
 /**
  * Get Binance client using keys stored on device
@@ -121,24 +122,28 @@ export async function getWithdrawalFee() {
 }
 
 /**
- * Execute market buy order for BTC/EUR
- * Buys BTC using a fixed EUR amount
+ * Execute market buy order for BTC
+ * Buys BTC using a fixed fiat amount in the specified currency
  *
- * @param {number} eurAmount - Amount in EUR to spend (e.g., 35)
+ * @param {number} fiatAmount - Amount in fiat currency to spend (e.g., 35)
  * @param {number} tradingFeePercent - Trading fee percentage (e.g., 0.1 for 0.1%, 0.2 for 0.2%)
+ * @param {string} currency - Currency code (e.g., 'EUR', 'USD', 'GBP')
  * @returns {Promise<Object>} Order result with execution details
  */
-export async function executeMarketBuy(eurAmount, tradingFeePercent = 0.1) {
+export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, currency = 'EUR') {
   const client = await getBinanceClient();
 
   try {
-    // Get current BTC/EUR price using the client
-    const ticker = await client.prices({ symbol: 'BTCEUR' });
-    const currentPrice = parseFloat(ticker.BTCEUR);
+    // Get the Binance trading pair for this currency
+    const symbol = getBinancePair(currency);
+
+    // Get current BTC price in the specified currency
+    const ticker = await client.prices({ symbol });
+    const currentPrice = parseFloat(ticker[symbol]);
 
     // Get symbol info to determine the correct precision for quantity
-    const exchangeInfo = await client.exchangeInfo({ symbol: 'BTCEUR' });
-    const symbolInfo = exchangeInfo.symbols.find(s => s.symbol === 'BTCEUR');
+    const exchangeInfo = await client.exchangeInfo({ symbol });
+    const symbolInfo = exchangeInfo.symbols.find(s => s.symbol === symbol);
 
     // Find LOT_SIZE filter to get step size (quantity precision)
     const lotSizeFilter = symbolInfo.filters.find(f => f.filterType === 'LOT_SIZE');
@@ -149,14 +154,14 @@ export async function executeMarketBuy(eurAmount, tradingFeePercent = 0.1) {
 
     // Calculate BTC quantity to buy
     // Note: Trading fee is automatically deducted by Binance, we don't subtract it here
-    const rawQuantity = eurAmount / currentPrice;
+    const rawQuantity = fiatAmount / currentPrice;
 
     // Round down to the correct precision
     const quantity = Math.floor(rawQuantity * Math.pow(10, precision)) / Math.pow(10, precision);
 
     // Execute market buy order with calculated quantity
     const order = await client.order({
-      symbol: 'BTCEUR',
+      symbol,
       side: 'BUY',
       type: 'MARKET',
       quantity: quantity.toFixed(precision),
@@ -164,34 +169,37 @@ export async function executeMarketBuy(eurAmount, tradingFeePercent = 0.1) {
 
     // Calculate actual execution details from fills
     let totalBtc = 0;
-    let totalEur = 0;
+    let totalFiat = 0;
     let totalFees = 0;
 
     if (order.fills && order.fills.length > 0) {
       order.fills.forEach(fill => {
         totalBtc += parseFloat(fill.qty);
-        totalEur += parseFloat(fill.price) * parseFloat(fill.qty);
+        totalFiat += parseFloat(fill.price) * parseFloat(fill.qty);
         totalFees += parseFloat(fill.commission); // Commission in BTC
       });
     } else {
       // Fallback to order-level data if fills not available
       totalBtc = parseFloat(order.executedQty);
-      totalEur = parseFloat(order.cummulativeQuoteQty);
+      totalFiat = parseFloat(order.cummulativeQuoteQty);
     }
 
     // Calculate average execution price
-    const avgPrice = totalEur / totalBtc;
+    const avgPrice = totalFiat / totalBtc;
 
     return {
       success: true,
       data: {
         orderId: order.orderId,
         btcAmount: totalBtc,
-        eurSpent: totalEur,
+        fiatSpent: totalFiat,
+        currency: currency,
         avgPrice: avgPrice,
         tradingFee: totalFees,
         timestamp: new Date(order.transactTime).toISOString(),
         fills: order.fills,
+        // Keep eurSpent for backward compatibility with older mobile app versions
+        eurSpent: totalFiat,
       },
     };
   } catch (error) {

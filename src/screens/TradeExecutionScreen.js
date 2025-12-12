@@ -11,6 +11,7 @@ import {
 import { executeMarketBuy } from '../services/binanceService';
 import { dcaAPI, authAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { getBinancePair, getCurrencySymbol } from '../utils/currency';
 
 export default function TradeExecutionScreen({ route, navigation }) {
   const { colors } = useTheme();
@@ -20,6 +21,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
   const [loadingPrice, setLoadingPrice] = useState(true);
   const [estimatedBtc, setEstimatedBtc] = useState(null);
   const [tradingFeePercent, setTradingFeePercent] = useState(0.1); // Default 0.1%
+  const [currency, setCurrency] = useState('EUR');
 
   useEffect(() => {
     // Load trading fee and estimate purchase
@@ -31,32 +33,40 @@ export default function TradeExecutionScreen({ route, navigation }) {
       const response = await authAPI.getSettings();
       if (response.success) {
         const fee = parseFloat(response.data.settings.exchangeTradingFee || 0.1);
+        const userCurrency = response.data.settings.currency || 'EUR';
         setTradingFeePercent(fee);
-        // Estimate purchase with the loaded fee
-        await estimatePurchase(fee);
+        setCurrency(userCurrency);
+        // Estimate purchase with the loaded fee and currency
+        await estimatePurchase(fee, userCurrency);
       } else {
-        // Use default fee
-        await estimatePurchase(0.1);
+        // Use defaults
+        await estimatePurchase(0.1, 'EUR');
       }
     } catch (error) {
       console.error('Error loading trading fee:', error);
-      // Use default fee
-      await estimatePurchase(0.1);
+      // Use defaults
+      await estimatePurchase(0.1, 'EUR');
     }
   };
 
-  const estimatePurchase = async (feePercent) => {
+  const estimatePurchase = async (feePercent, userCurrency = 'EUR') => {
     try {
-      // Fetch current BTC/EUR price from Binance for estimation
-      const response = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCEUR');
+      // Get the correct trading pair for the user's currency
+      const symbol = getBinancePair(userCurrency);
+
+      // Fetch current BTC price in user's currency from Binance
+      const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
       const data = await response.json();
       const currentPrice = parseFloat(data.price);
 
       setBtcPrice(currentPrice);
 
+      // Get fiat amount from tradeData (supports both old eurAmount and new fiatAmount)
+      const fiatAmount = tradeData.fiatAmount || tradeData.eurAmount;
+
       // Estimate BTC amount
       // Note: Trading fee is automatically deducted by Binance, this is just an estimate
-      const estimatedAmount = tradeData.eurAmount / currentPrice;
+      const estimatedAmount = fiatAmount / currentPrice;
       setEstimatedBtc(estimatedAmount);
     } catch (error) {
       console.error('Error estimating purchase:', error);
@@ -66,9 +76,12 @@ export default function TradeExecutionScreen({ route, navigation }) {
   };
 
   const handleExecute = async () => {
+    const fiatAmount = tradeData.fiatAmount || tradeData.eurAmount;
+    const currencySymbol = getCurrencySymbol(currency);
+
     Alert.alert(
       'Confirm DCA Purchase',
-      `Execute market buy order for €${tradeData.eurAmount}?\n\nEstimated: ${estimatedBtc?.toFixed(8) || '~'} BTC`,
+      `Execute market buy order for ${currencySymbol}${fiatAmount} ${currency}?\n\nEstimated: ${estimatedBtc?.toFixed(8) || '~'} BTC`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -83,15 +96,19 @@ export default function TradeExecutionScreen({ route, navigation }) {
   const executeTrade = async () => {
     setLoading(true);
     try {
-      const result = await executeMarketBuy(tradeData.eurAmount, tradingFeePercent);
+      const fiatAmount = tradeData.fiatAmount || tradeData.eurAmount;
+      const result = await executeMarketBuy(fiatAmount, tradingFeePercent, currency);
 
       if (result.success) {
+        const currencySymbol = getCurrencySymbol(currency);
+
         // Report the trade execution to the server
         try {
           await dcaAPI.reportTradeExecution({
             orderId: result.data.orderId,
             btcAmount: result.data.btcAmount,
-            eurSpent: result.data.eurSpent,
+            fiatSpent: result.data.fiatSpent,
+            currency: result.data.currency,
             avgPrice: result.data.avgPrice,
             tradingFee: result.data.tradingFee,
             timestamp: result.data.timestamp,
@@ -105,8 +122,8 @@ export default function TradeExecutionScreen({ route, navigation }) {
           'Success',
           `Trade executed successfully!\n\n` +
           `BTC Purchased: ${result.data.btcAmount.toFixed(8)}\n` +
-          `EUR Spent: €${result.data.eurSpent.toFixed(2)}\n` +
-          `Avg Price: €${result.data.avgPrice.toFixed(2)}`,
+          `${currency} Spent: ${currencySymbol}${result.data.fiatSpent.toFixed(2)}\n` +
+          `Avg Price: ${currencySymbol}${result.data.avgPrice.toFixed(2)}`,
           [
             {
               text: 'OK',
@@ -149,8 +166,10 @@ export default function TradeExecutionScreen({ route, navigation }) {
 
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>EUR Amount:</Text>
-            <Text style={styles.infoValue}>€{tradeData.eurAmount.toFixed(2)}</Text>
+            <Text style={styles.infoLabel}>{currency} Amount:</Text>
+            <Text style={styles.infoValue}>
+              {getCurrencySymbol(currency)}{(tradeData.fiatAmount || tradeData.eurAmount).toFixed(2)}
+            </Text>
           </View>
 
           {loadingPrice ? (
@@ -159,7 +178,9 @@ export default function TradeExecutionScreen({ route, navigation }) {
             <>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Current BTC Price:</Text>
-                <Text style={styles.infoValue}>€{btcPrice?.toFixed(2) || '-'}</Text>
+                <Text style={styles.infoValue}>
+                  {getCurrencySymbol(currency)}{btcPrice?.toFixed(2) || '-'}
+                </Text>
               </View>
 
               <View style={styles.infoRow}>
@@ -169,7 +190,9 @@ export default function TradeExecutionScreen({ route, navigation }) {
 
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabelSmall}>Trading Fee ({tradingFeePercent}%):</Text>
-                <Text style={styles.infoValueSmall}>~€{(tradeData.eurAmount * (tradingFeePercent / 100)).toFixed(2)}</Text>
+                <Text style={styles.infoValueSmall}>
+                  ~{getCurrencySymbol(currency)}{((tradeData.fiatAmount || tradeData.eurAmount) * (tradingFeePercent / 100)).toFixed(2)}
+                </Text>
               </View>
             </>
           )}
