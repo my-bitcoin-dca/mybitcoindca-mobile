@@ -1,12 +1,12 @@
 # DCA Bitcoin Mobile App
 
-[![Semgrep Security](https://github.com/matthill500/mybitcoindca/actions/workflows/semgrep.yml/badge.svg)](https://github.com/matthill500/mybitcoindca/actions/workflows/semgrep.yml)
+[![Semgrep Security](https://github.com/my-bitcoin-dca/mybitcoindca-mobile/actions/workflows/semgrep.yml/badge.svg)](https://github.com/my-bitcoin-dca/mybitcoindca-mobile/actions/workflows/semgrep.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Privacy First](https://img.shields.io/badge/Privacy-First-success.svg)](https://github.com/matthill500/mybitcoindca)
+[![Privacy First](https://img.shields.io/badge/Privacy-First-success.svg)](https://github.com/my-bitcoin-dca/mybitcoindca-mobile)
 
 A React Native mobile app for secure Bitcoin withdrawal management with privacy-first, client-side security architecture.
 
-**🔒 Security Verified:** Automated AI-powered scans verify that API keys never leave your device. [View latest scan →](https://github.com/matthill500/mybitcoindca/actions/workflows/semgrep.yml)
+**🔒 Security Verified:** Automated AI-powered scans verify that API keys never leave your device. [View latest scan →](https://github.com/my-bitcoin-dca/mybitcoindca-mobile/actions/workflows/semgrep.yml)
 
 ## Overview
 
@@ -139,7 +139,7 @@ Every code change is automatically scanned with **Semgrep** - an AI-powered secu
    - ✅ Green = All security checks passed
    - ❌ Red = Security issue detected (build will fail)
 
-2. **Check the scan results**: [View latest security scan](https://github.com/matthill500/mybitcoindca/actions/workflows/semgrep.yml)
+2. **Check the scan results**: [View latest security scan](https://github.com/my-bitcoin-dca/mybitcoindca-mobile/actions/workflows/semgrep.yml)
 
 3. **Review the security rules**: See [`.semgrep/rules/api-key-security.yaml`](.semgrep/rules/api-key-security.yaml) for the exact checks
 
