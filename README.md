@@ -143,7 +143,7 @@ Every code change is automatically scanned with **Semgrep** - an AI-powered secu
 
 3. **Review the security rules**: See [`.semgrep/rules/api-key-security.yaml`](.semgrep/rules/api-key-security.yaml) for the exact checks
 
-4. **Audit the code yourself**: This is open source - inspect every line!
+4. **Audit the code yourself**: This is public code - inspect every line!
 
 ### Continuous Security
 
