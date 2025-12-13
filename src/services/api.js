@@ -95,6 +95,40 @@ export const authAPI = {
     return response.data;
   },
 
+  register: async (name, email, password) => {
+    const response = await axios.post(`${AUTH_URL}/register`, {
+      name,
+      email,
+      password,
+    }, {
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  requestPasswordReset: async (email) => {
+    const response = await axios.post(`${AUTH_URL}/forgot-password`, {
+      email,
+      platform: 'mobile',
+    });
+    return response.data;
+  },
+
+  verifyResetToken: async (token) => {
+    const response = await axios.post(`${AUTH_URL}/verify-reset-token`, {
+      token,
+    });
+    return response.data;
+  },
+
+  resetPassword: async (token, newPassword) => {
+    const response = await axios.post(`${AUTH_URL}/reset-password`, {
+      token,
+      newPassword,
+    });
+    return response.data;
+  },
+
   getSettings: async () => {
     const response = await axios.get(`${AUTH_URL}/settings`, {
       withCredentials: true,

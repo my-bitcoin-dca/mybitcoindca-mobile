@@ -9,6 +9,9 @@ import { useTheme } from '../contexts/ThemeContext';
 // Screens
 import DisclaimerScreen from '../screens/DisclaimerScreen';
 import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import PasscodeScreen from '../screens/PasscodeScreen';
 import HomeScreen from '../screens/HomeScreen';
 import APIKeysScreen from '../screens/APIKeysScreen';
@@ -196,7 +199,14 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
       onReady={() => setIsNavigationReady(true)}
     >
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!disclaimerAccepted ? (
+        {!isAuthenticated ? (
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          </>
+        ) : !disclaimerAccepted ? (
           <Stack.Screen name="Disclaimer">
             {(props) => (
               <DisclaimerScreen
@@ -205,8 +215,6 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
               />
             )}
           </Stack.Screen>
-        ) : !isAuthenticated ? (
-          <Stack.Screen name="Login" component={LoginScreen} />
         ) : needsPasscodeSetup ? (
           <Stack.Screen
             name="PasscodeSetup"

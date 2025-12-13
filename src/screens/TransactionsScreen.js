@@ -11,6 +11,24 @@ import {
 import { dcaAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 
+// Currency code to symbol mapping (matches server config)
+const getCurrencySymbol = (currencyCode) => {
+  const symbols = {
+    'EUR': '€',
+    'USD': '$',
+    'GBP': '£',
+    'USDT': '₮',
+    'USDC': 'USDC',
+    'BUSD': 'BUSD',
+    'AUD': 'A$',
+    'BRL': 'R$',
+    'CAD': 'C$',
+    'TRY': '₺',
+    'TUSD': 'TUSD',
+  };
+  return symbols[currencyCode] || currencyCode;
+};
+
 export default function TransactionsScreen() {
   const { colors } = useTheme();
   const [transactions, setTransactions] = useState([]);
@@ -57,7 +75,12 @@ export default function TransactionsScreen() {
   const styles = createStyles(colors);
 
   const renderPurchase = ({ item }) => {
-    const netCost = item.eurCost - (item.tradingFee || 0);
+    // Handle both old (eurCost/eurPrice) and new (fiatCost/fiatPrice) field names
+    const cost = item.fiatCost !== undefined ? item.fiatCost : (item.eurCost || 0);
+    const price = item.fiatPrice !== undefined ? item.fiatPrice : (item.eurPrice || 0);
+    const currencySymbol = getCurrencySymbol(item.currency || 'EUR');
+    const netCost = cost - (item.tradingFee || 0);
+
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
@@ -69,15 +92,15 @@ export default function TransactionsScreen() {
         <View style={styles.cardContent}>
           <View>
             <Text style={styles.label}>Amount</Text>
-            <Text style={styles.value}>{parseFloat(item.btcAmount).toFixed(8)} BTC</Text>
+            <Text style={styles.value}>{parseFloat(item.btcAmount || 0).toFixed(8)} BTC</Text>
           </View>
           <View>
             <Text style={styles.label}>Cost</Text>
-            <Text style={styles.value}>€{netCost.toFixed(2)}</Text>
+            <Text style={styles.value}>{currencySymbol}{netCost.toFixed(2)}</Text>
           </View>
           <View>
             <Text style={styles.label}>Price</Text>
-            <Text style={styles.value}>€{parseFloat(item.eurPrice).toFixed(2)}</Text>
+            <Text style={styles.value}>{currencySymbol}{parseFloat(price).toFixed(2)}</Text>
           </View>
         </View>
       </View>
@@ -95,11 +118,11 @@ export default function TransactionsScreen() {
       <View style={styles.cardContent}>
         <View>
           <Text style={styles.label}>Amount</Text>
-          <Text style={styles.value}>{parseFloat(item.amount).toFixed(8)} BTC</Text>
+          <Text style={styles.value}>{parseFloat(item.amount || 0).toFixed(8)} BTC</Text>
         </View>
         <View>
           <Text style={styles.label}>Fee</Text>
-          <Text style={styles.value}>{parseFloat(item.transactionFee).toFixed(8)} BTC</Text>
+          <Text style={styles.value}>{parseFloat(item.transactionFee || 0).toFixed(8)} BTC</Text>
         </View>
       </View>
       <Text style={styles.txId} numberOfLines={1}>

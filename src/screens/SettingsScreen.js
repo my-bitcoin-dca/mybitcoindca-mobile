@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { authAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '../utils/currency';
 import storage from '../utils/storage';
@@ -34,6 +35,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => ({
 }));
 
 export default function SettingsScreen({ navigation }) {
+  const { logout } = useAuth();
   const { colors, isDarkMode, toggleTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -208,23 +210,10 @@ export default function SettingsScreen({ navigation }) {
       const response = await authAPI.deleteAccount();
 
       if (response.success) {
-        // Logout to clear server-side session/cookies
-        await authAPI.logout();
-        // Clear local storage
-        await storage.deleteItem('accessToken');
+        // Logout - this will clear all storage and reset auth state
+        await logout();
 
-        Alert.alert('Account Deleted', 'Your account has been permanently deleted.', [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Navigate to login
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              });
-            },
-          },
-        ]);
+        Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
       } else {
         Alert.alert('Error', response.message || 'Failed to delete account');
       }

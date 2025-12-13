@@ -50,6 +50,60 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const register = async (name, email, password) => {
+    try {
+      const response = await authAPI.register(name, email, password);
+      if (response.success) {
+        await storage.setItem('accessToken', response.data.accessToken);
+        setUser(response.data.user);
+        setIsAuthenticated(true);
+        return { success: true };
+      }
+      return { success: false, message: response.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Registration failed',
+      };
+    }
+  };
+
+  const requestPasswordReset = async (email) => {
+    try {
+      const response = await authAPI.requestPasswordReset(email);
+      return { success: response.success, message: response.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to send reset email',
+      };
+    }
+  };
+
+  const verifyResetToken = async (token) => {
+    try {
+      const response = await authAPI.verifyResetToken(token);
+      return { success: response.success, message: response.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Invalid reset token',
+      };
+    }
+  };
+
+  const resetPassword = async (token, newPassword) => {
+    try {
+      const response = await authAPI.resetPassword(token, newPassword);
+      return { success: response.success, message: response.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to reset password',
+      };
+    }
+  };
+
   const logout = async () => {
     try {
       await authAPI.logout();
@@ -57,6 +111,8 @@ export const AuthProvider = ({ children }) => {
       console.error('Logout error:', error);
     } finally {
       await storage.deleteItem('accessToken');
+      await storage.deleteItem('disclaimer_accepted');
+      await storage.deleteItem('app_passcode');
       setUser(null);
       setIsAuthenticated(false);
       setPasscodeLocked(true);
@@ -93,7 +149,11 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated,
         passcodeLocked,
         login,
+        register,
         logout,
+        requestPasswordReset,
+        verifyResetToken,
+        resetPassword,
         unlockWithPasscode,
         setPasscode,
         hasPasscode,
