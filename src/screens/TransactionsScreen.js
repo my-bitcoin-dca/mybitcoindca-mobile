@@ -17,6 +17,7 @@ export default function TransactionsScreen() {
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isMockData, setIsMockData] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -31,9 +32,14 @@ export default function TransactionsScreen() {
 
       if (txResponse.success && txResponse.data) {
         setTransactions(txResponse.data);
+        setIsMockData(txResponse.isMockData || false);
       }
       if (purchaseResponse.success && purchaseResponse.data) {
         setPurchases(purchaseResponse.data);
+        // Update isMockData if either response indicates mock data
+        if (purchaseResponse.isMockData) {
+          setIsMockData(true);
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -121,6 +127,14 @@ export default function TransactionsScreen() {
 
   return (
     <View style={styles.container}>
+      {isMockData && (
+        <View style={styles.mockDataBanner}>
+          <Text style={styles.mockDataText}>
+            📊 Preview Data - Subscribe to see your real transaction history
+          </Text>
+        </View>
+      )}
+
       <View style={styles.header}>
         <Text style={styles.title}>Transaction History</Text>
         <Text style={styles.subtitle}>
@@ -233,5 +247,17 @@ const createStyles = (colors) => StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: colors.textSecondary,
+  },
+  mockDataBanner: {
+    backgroundColor: '#FF9800',
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockDataText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

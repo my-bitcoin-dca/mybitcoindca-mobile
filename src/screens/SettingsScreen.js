@@ -236,13 +236,13 @@ export default function SettingsScreen({ navigation }) {
               onValueChange={(itemValue) => setCurrency(itemValue)}
               style={styles.picker}
               dropdownIconColor={colors.text}
+              itemStyle={Platform.OS === 'ios' ? styles.pickerItem : undefined}
             >
               {SUPPORTED_CURRENCIES.map((curr) => (
                 <Picker.Item
                   key={curr.code}
                   label={`${curr.symbol} ${curr.name} (${curr.code})`}
                   value={curr.code}
-                  color={colors.text}
                 />
               ))}
             </Picker>
@@ -465,10 +465,19 @@ const createStyles = (colors) => StyleSheet.create({
   },
   pickerContainer: {
     paddingHorizontal: 0,
+    overflow: 'hidden',
+    ...(Platform.OS === 'ios' && {
+      height: 180,
+    }),
   },
   picker: {
     flex: 1,
-    height: 48,
+    height: Platform.OS === 'ios' ? 180 : 48,
+    color: colors.text,
+  },
+  pickerItem: {
+    height: 180,
+    fontSize: 16,
     color: colors.text,
   },
   input: {
