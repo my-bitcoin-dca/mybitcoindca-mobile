@@ -208,12 +208,16 @@ export default function SettingsScreen({ navigation }) {
       const response = await authAPI.deleteAccount();
 
       if (response.success) {
+        // Logout to clear server-side session/cookies
+        await authAPI.logout();
+        // Clear local storage
+        await storage.deleteItem('accessToken');
+
         Alert.alert('Account Deleted', 'Your account has been permanently deleted.', [
           {
             text: 'OK',
             onPress: () => {
-              // Clear local storage and navigate to login
-              storage.deleteItem('accessToken');
+              // Navigate to login
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'Login' }],
