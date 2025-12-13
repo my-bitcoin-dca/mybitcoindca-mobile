@@ -16,6 +16,7 @@ import { Picker } from '@react-native-picker/picker';
 import { authAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '../utils/currency';
+import storage from '../utils/storage';
 
 const DAYS_OF_WEEK = [
   { label: 'Monday', value: 'monday' },
@@ -180,6 +181,52 @@ export default function SettingsScreen({ navigation }) {
       return 'Bech32 addresses must be lowercase';
     } else {
       return 'Please enter a valid Bitcoin address (starts with 1, 3, bc1q, or bc1p)';
+    }
+  };
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Confirm Account Deletion',
+      'Are you absolutely sure you want to delete your account?\n\nThis will permanently remove:\n• All your purchase history\n• All withdrawal transactions\n• Your subscription (if active)\n• All settings and preferences\n• All account data\n\nThis action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: handleDeleteAccount,
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      const response = await authAPI.deleteAccount();
+
+      if (response.success) {
+        Alert.alert('Account Deleted', 'Your account has been permanently deleted.', [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Clear local storage and navigate to login
+              storage.deleteItem('accessToken');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            },
+          },
+        ]);
+      } else {
+        Alert.alert('Error', response.message || 'Failed to delete account');
+      }
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      Alert.alert('Error', 'Failed to delete account. Please try again.');
     }
   };
 
@@ -412,6 +459,34 @@ export default function SettingsScreen({ navigation }) {
             ⓘ Your purchase schedule is in server time (UTC). You'll receive a notification to execute the trade at the scheduled time.
           </Text>
         </View>
+
+        <Text style={styles.sectionTitle}>Danger Zone</Text>
+
+        {/* Delete Account */}
+        <View style={[styles.inputGroup, styles.dangerZone]}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingLeft}>
+              <Ionicons
+                name="warning"
+                size={24}
+                color="#dc3545"
+                style={styles.settingIcon}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dangerLabel}>Delete Account</Text>
+                <Text style={styles.description}>
+                  Permanently delete your account and all associated data. This action cannot be undone.
+                </Text>
+              </View>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={confirmDeleteAccount}
+          >
+            <Text style={styles.deleteButtonText}>Delete My Account</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -621,5 +696,27 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     lineHeight: 20,
+  },
+  dangerZone: {
+    borderWidth: 2,
+    borderColor: '#dc3545',
+  },
+  dangerLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#dc3545',
+    marginBottom: 4,
+  },
+  deleteButton: {
+    backgroundColor: '#dc3545',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -136,6 +136,11 @@ export const authAPI = {
     const response = await api.put('/auth/settings', settings);
     return response.data;
   },
+
+  deleteAccount: async () => {
+    const response = await api.delete('/auth/account');
+    return response.data;
+  },
 };
 
 // DCA API calls
