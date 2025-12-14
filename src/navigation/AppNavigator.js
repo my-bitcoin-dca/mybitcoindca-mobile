@@ -1,8 +1,10 @@
 import React, { useEffect, useState, forwardRef } from 'react';
+import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -82,6 +84,8 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
 
   // Bottom Tab Navigator for main screens
   function MainTabs() {
+    const insets = useSafeAreaInsets();
+
     return (
       <Tab.Navigator
         screenOptions={{
@@ -91,9 +95,9 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
             backgroundColor: colors.tabBackground,
             borderTopWidth: 1,
             borderTopColor: colors.border,
-            paddingBottom: 24,
             paddingTop: 8,
-            height: 80,
+            paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, 20) : Math.max(insets.bottom, 28),
+            height: Platform.OS === 'android' ? 80 + insets.bottom : 88,
             elevation: 8,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -2 },

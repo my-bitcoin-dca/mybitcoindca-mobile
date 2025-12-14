@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Platform, Alert } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Platform, Alert, StatusBar as RNStatusBar } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { ThemeProvider } from './src/contexts/ThemeContext';
@@ -39,6 +40,15 @@ export default function App() {
       });
     }
   };
+
+  useEffect(() => {
+    // Configure status bar for Android
+    if (Platform.OS === 'android') {
+      RNStatusBar.setBarStyle('dark-content');
+      RNStatusBar.setBackgroundColor('#ffffff');
+      RNStatusBar.setTranslucent(false);
+    }
+  }, []);
 
   useEffect(() => {
     // Only set up push notifications on native platforms (iOS/Android)
@@ -109,17 +119,19 @@ export default function App() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <AuthProvider>
-          <StatusBar style="light" />
-          <AppNavigator
-            ref={navigationRef}
-            pendingNotification={pendingNotification}
-            onNotificationHandled={() => setPendingNotification(null)}
-          />
-        </AuthProvider>
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeProvider>
+          <AuthProvider>
+            <StatusBar style="light" />
+            <AppNavigator
+              ref={navigationRef}
+              pendingNotification={pendingNotification}
+              onNotificationHandled={() => setPendingNotification(null)}
+            />
+          </AuthProvider>
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }

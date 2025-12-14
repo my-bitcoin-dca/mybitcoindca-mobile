@@ -568,11 +568,17 @@ const createStyles = (colors) => StyleSheet.create({
     ...(Platform.OS === 'ios' && {
       height: 180,
     }),
+    ...(Platform.OS === 'android' && {
+      paddingVertical: 4,
+    }),
   },
   picker: {
     flex: 1,
-    height: Platform.OS === 'ios' ? 180 : 48,
+    height: Platform.OS === 'ios' ? 180 : 56,
     color: colors.text,
+    ...(Platform.OS === 'android' && {
+      marginVertical: -8,
+    }),
   },
   pickerItem: {
     height: 180,
