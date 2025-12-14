@@ -7,15 +7,15 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "prebuildCommand": "bash eas-hooks/prebuild.sh"
+      "prebuildCommand": "./eas-hooks/prebuild.sh"
     },
     "preview": {
       "distribution": "internal",
-      "prebuildCommand": "bash eas-hooks/prebuild.sh"
+      "prebuildCommand": "./eas-hooks/prebuild.sh"
     },
     "production": {
       "autoIncrement": true,
-      "prebuildCommand": "bash eas-hooks/prebuild.sh"
+      "prebuildCommand": "./eas-hooks/prebuild.sh"
     }
   },
   "submit": {
