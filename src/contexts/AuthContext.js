@@ -1,6 +1,8 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import storage from '../utils/storage';
 import { authAPI } from '../services/api';
+import { registerForPushNotifications, sendPushTokenToServer } from '../services/notificationService';
+import { Platform } from 'react-native';
 
 const AuthContext = createContext({});
 
@@ -22,6 +24,8 @@ export const AuthProvider = ({ children }) => {
         if (response.success) {
           setUser(response.data.user);
           setIsAuthenticated(true);
+          // Register push notifications after successful auth check
+          await registerPushToken();
         }
       }
     } catch (error) {
@@ -39,6 +43,8 @@ export const AuthProvider = ({ children }) => {
         await storage.setItem('accessToken', response.data.accessToken);
         setUser(response.data.user);
         setIsAuthenticated(true);
+        // Register push notifications after successful login
+        await registerPushToken();
         return { success: true };
       }
       return { success: false, message: response.message };
@@ -57,6 +63,8 @@ export const AuthProvider = ({ children }) => {
         await storage.setItem('accessToken', response.data.accessToken);
         setUser(response.data.user);
         setIsAuthenticated(true);
+        // Register push notifications after successful registration
+        await registerPushToken();
         return { success: true };
       }
       return { success: false, message: response.message };
@@ -139,6 +147,23 @@ export const AuthProvider = ({ children }) => {
 
   const lockApp = () => {
     setPasscodeLocked(true);
+  };
+
+  // Helper function to register push notifications
+  const registerPushToken = async () => {
+    // Only register on native platforms (iOS/Android)
+    if (Platform.OS === 'web') return;
+
+    try {
+      const token = await registerForPushNotifications();
+      if (token) {
+        await sendPushTokenToServer(token);
+        console.log('[Auth] Push token registered successfully');
+      }
+    } catch (error) {
+      console.log('[Auth] Push notification registration failed:', error);
+      // Don't fail auth if push registration fails
+    }
   };
 
   return (

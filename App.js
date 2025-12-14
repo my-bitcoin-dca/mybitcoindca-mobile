@@ -7,8 +7,6 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import {
-  registerForPushNotifications,
-  sendPushTokenToServer,
   setupNotificationListeners,
   parseWithdrawalNotification,
   parseTradeExecutionNotification,
@@ -45,14 +43,8 @@ export default function App() {
   useEffect(() => {
     // Only set up push notifications on native platforms (iOS/Android)
     if (Platform.OS !== 'web') {
-      // Register for push notifications
-      registerForPushNotifications().then(token => {
-        if (token) {
-          sendPushTokenToServer(token);
-        }
-      }).catch(err => {
-        console.log('Push notification registration failed:', err);
-      });
+      // Push token registration is now handled in AuthContext after login/registration
+      // This ensures the user is authenticated before sending the token to the server
 
       // Check if app was opened from a notification tap
       const checkInitialNotification = async () => {
