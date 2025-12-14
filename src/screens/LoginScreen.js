@@ -103,12 +103,12 @@ export default function LoginScreen({ navigation }) {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerTitle}>Third-Party Binance Client</Text>
+          <Text style={styles.footerTitle}>Third-Party Exchange Client</Text>
           <Text style={styles.footerText}>
-            This app is NOT an exchange or broker. It's a third-party interface for executing trades and withdrawals on YOUR Binance account.
+            This app is NOT an exchange or broker. It's a third-party interface for executing trades and withdrawals on YOUR exchange account.
           </Text>
           <Text style={styles.footerText}>
-            Your Binance API keys are encrypted and stored ONLY on your device using iOS Keychain. Keys never leave your phone.
+            Your exchange API keys are encrypted and stored ONLY on your device using {Platform.OS === 'ios' ? 'iOS Keychain' : 'Android Keystore'}. Keys never leave your phone.
           </Text>
       
           <Text style={styles.footerText}>
