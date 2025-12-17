@@ -49,6 +49,11 @@ export default function SettingsScreen({ navigation }) {
   const [selectedDay, setSelectedDay] = useState('thursday');
   const [selectedHour, setSelectedHour] = useState(8);
 
+  // Notification preferences
+  const [anomalyAlerts, setAnomalyAlerts] = useState(true);
+  const [withdrawalReminders, setWithdrawalReminders] = useState(true);
+  const [purchaseConfirmations, setPurchaseConfirmations] = useState(true);
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -67,6 +72,11 @@ export default function SettingsScreen({ navigation }) {
         setAppWithdrawal(settings.appWithdrawal ?? true);
         setSelectedDay(settings.purchaseSchedule?.dayOfWeek || 'thursday');
         setSelectedHour(settings.purchaseSchedule?.hour ?? 8);
+
+        // Load notification preferences
+        setAnomalyAlerts(settings.notifications?.anomalyAlerts ?? true);
+        setWithdrawalReminders(settings.notifications?.withdrawalReminders ?? true);
+        setPurchaseConfirmations(settings.notifications?.purchaseConfirmations ?? true);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -118,6 +128,11 @@ export default function SettingsScreen({ navigation }) {
         purchaseSchedule: {
           dayOfWeek: selectedDay,
           hour: selectedHour,
+        },
+        notifications: {
+          anomalyAlerts: anomalyAlerts,
+          withdrawalReminders: withdrawalReminders,
+          purchaseConfirmations: purchaseConfirmations,
         },
       });
 
@@ -377,6 +392,86 @@ export default function SettingsScreen({ navigation }) {
                 </Text>
               </TouchableOpacity>
             ))}
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Push Notifications</Text>
+
+        {/* Anomaly Alerts */}
+        <View style={styles.inputGroup}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingLeft}>
+              <Ionicons
+                name="notifications"
+                size={24}
+                color={colors.secondary}
+                style={styles.settingIcon}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Anomaly Alerts (Beta)</Text>
+                <Text style={styles.description}>
+                  Get notified when unusual market conditions present buying opportunities
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={anomalyAlerts}
+              onValueChange={setAnomalyAlerts}
+              trackColor={{ false: colors.border, true: colors.secondary }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+
+        {/* Withdrawal Reminders */}
+        <View style={styles.inputGroup}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingLeft}>
+              <Ionicons
+                name="wallet"
+                size={24}
+                color={colors.secondary}
+                style={styles.settingIcon}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Withdrawal Reminders</Text>
+                <Text style={styles.description}>
+                  Get reminded when it's time to withdraw to your hardware wallet
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={withdrawalReminders}
+              onValueChange={setWithdrawalReminders}
+              trackColor={{ false: colors.border, true: colors.secondary }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+
+        {/* Purchase Confirmations */}
+        <View style={styles.inputGroup}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingLeft}>
+              <Ionicons
+                name="checkmark-circle"
+                size={24}
+                color={colors.secondary}
+                style={styles.settingIcon}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Purchase Confirmations</Text>
+                <Text style={styles.description}>
+                  Get notified when your scheduled DCA purchases are executed
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={purchaseConfirmations}
+              onValueChange={setPurchaseConfirmations}
+              trackColor={{ false: colors.border, true: colors.secondary }}
+              thumbColor="#fff"
+            />
           </View>
         </View>
 

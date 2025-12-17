@@ -15,13 +15,18 @@ import { getBinancePair, getCurrencySymbol } from '../utils/currency';
 
 export default function TradeExecutionScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const { tradeData } = route.params;
+  const { tradeData, anomalyData } = route.params || {};
+
+  // If coming from anomaly alert without tradeData, use a default amount
+  const defaultAmount = 100; // Default to 100 currency units
+  const effectiveTradeData = tradeData || { fiatAmount: defaultAmount };
+
   const [loading, setLoading] = useState(false);
   const [btcPrice, setBtcPrice] = useState(null);
   const [loadingPrice, setLoadingPrice] = useState(true);
   const [estimatedBtc, setEstimatedBtc] = useState(null);
   const [tradingFeePercent, setTradingFeePercent] = useState(0.1); // Default 0.1%
-  const [currency, setCurrency] = useState('EUR');
+  const [currency, setCurrency] = useState(anomalyData?.currency || 'EUR');
 
   useEffect(() => {
     // Load trading fee and estimate purchase
@@ -61,8 +66,8 @@ export default function TradeExecutionScreen({ route, navigation }) {
 
       setBtcPrice(currentPrice);
 
-      // Get fiat amount from tradeData (supports both old eurAmount and new fiatAmount)
-      const fiatAmount = tradeData.fiatAmount || tradeData.eurAmount;
+      // Get fiat amount from effectiveTradeData (supports both old eurAmount and new fiatAmount)
+      const fiatAmount = effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount;
 
       // Estimate BTC amount
       // Note: Trading fee is automatically deducted by Binance, this is just an estimate
@@ -76,7 +81,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
   };
 
   const handleExecute = async () => {
-    const fiatAmount = tradeData.fiatAmount || tradeData.eurAmount;
+    const fiatAmount = effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount;
     const currencySymbol = getCurrencySymbol(currency);
 
     Alert.alert(
@@ -96,7 +101,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
   const executeTrade = async () => {
     setLoading(true);
     try {
-      const fiatAmount = tradeData.fiatAmount || tradeData.eurAmount;
+      const fiatAmount = effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount;
       const result = await executeMarketBuy(fiatAmount, tradingFeePercent, currency);
 
       if (result.success) {
@@ -162,13 +167,49 @@ export default function TradeExecutionScreen({ route, navigation }) {
     <ScrollView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>DCA Purchase</Text>
-        <Text style={styles.subtitle}>Execute your scheduled Bitcoin purchase</Text>
+        <Text style={styles.subtitle}>
+          {anomalyData ? 'Take advantage of this buying opportunity' : 'Execute your scheduled Bitcoin purchase'}
+        </Text>
+
+        {/* Anomaly Alert Opportunity Card */}
+        {anomalyData && (
+          <View style={styles.opportunityCard}>
+            <View style={styles.opportunityHeader}>
+              <Text style={styles.opportunityBadge}>🎯 BUYING OPPORTUNITY</Text>
+            </View>
+
+            <Text style={styles.opportunityTitle}>
+              Bitcoin {anomalyData.priceChange > 0 ? 'Surged' : 'Dropped'} {Math.abs(anomalyData.priceChange).toFixed(1)}%
+            </Text>
+
+            <View style={styles.metricsContainer}>
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Success Rate</Text>
+                <Text style={styles.metricValue}>{anomalyData.successRate}</Text>
+              </View>
+
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Expected Return</Text>
+                <Text style={styles.metricValue}>+{anomalyData.expectedReturn.toFixed(1)}%</Text>
+              </View>
+
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Confidence</Text>
+                <Text style={styles.metricValue}>{(anomalyData.confidence * 100).toFixed(0)}%</Text>
+              </View>
+            </View>
+
+            <Text style={styles.opportunityNote}>
+              Based on historical analysis of similar market conditions
+            </Text>
+          </View>
+        )}
 
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{currency} Amount:</Text>
             <Text style={styles.infoValue}>
-              {getCurrencySymbol(currency)}{(tradeData.fiatAmount || tradeData.eurAmount).toFixed(2)}
+              {getCurrencySymbol(currency)}{(effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount).toFixed(2)}
             </Text>
           </View>
 
@@ -191,7 +232,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabelSmall}>Trading Fee ({tradingFeePercent}%):</Text>
                 <Text style={styles.infoValueSmall}>
-                  ~{getCurrencySymbol(currency)}{((tradeData.fiatAmount || tradeData.eurAmount) * (tradingFeePercent / 100)).toFixed(2)}
+                  ~{getCurrencySymbol(currency)}{((effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount) * (tradingFeePercent / 100)).toFixed(2)}
                 </Text>
               </View>
             </>
@@ -248,6 +289,64 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     marginBottom: 24,
+  },
+  opportunityCard: {
+    backgroundColor: '#e8f5e9',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#4caf50',
+    shadowColor: '#4caf50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  opportunityHeader: {
+    marginBottom: 12,
+  },
+  opportunityBadge: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#2e7d32',
+    letterSpacing: 1,
+  },
+  opportunityTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1b5e20',
+    marginBottom: 16,
+  },
+  metricsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 8,
+  },
+  metricItem: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  metricLabel: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2e7d32',
+  },
+  opportunityNote: {
+    fontSize: 12,
+    color: '#558b2f',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
   infoCard: {
     backgroundColor: colors.cardBackground,

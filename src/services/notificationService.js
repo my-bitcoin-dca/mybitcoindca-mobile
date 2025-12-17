@@ -138,3 +138,27 @@ export function parseTradeExecutionNotification(notification) {
 
   return null;
 }
+
+/**
+ * Handle an anomaly alert notification
+ * Parse the notification data for anomaly detection alerts
+ * @param {Object} notification - Notification object
+ * @returns {Object|null} Anomaly alert data or null
+ */
+export function parseAnomalyAlertNotification(notification) {
+  const data = notification.request.content.data;
+
+  if (data.type === 'anomaly_alert') {
+    return {
+      alertId: data.alertId,
+      currentPrice: data.currentPrice,
+      confidence: data.confidence,
+      successRate: data.successRate,
+      expectedReturn: data.expectedReturn,
+      priceChange: data.priceChange,
+      currency: data.currency,
+    };
+  }
+
+  return null;
+}

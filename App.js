@@ -11,6 +11,7 @@ import {
   setupNotificationListeners,
   parseWithdrawalNotification,
   parseTradeExecutionNotification,
+  parseAnomalyAlertNotification,
 } from './src/services/notificationService';
 
 export default function App() {
@@ -37,6 +38,17 @@ export default function App() {
         type: 'trade',
         screen: 'TradeExecution',
         params: { tradeData },
+      });
+      return;
+    }
+
+    // Check for anomaly alert notifications
+    const anomalyData = parseAnomalyAlertNotification(response.notification);
+    if (anomalyData) {
+      setPendingNotification({
+        type: 'anomaly_alert',
+        screen: 'TradeExecution',
+        params: { anomalyData },
       });
     }
   };
@@ -106,6 +118,27 @@ export default function App() {
                   },
                 },
                 { text: 'Skip', style: 'cancel' },
+              ]
+            );
+            return;
+          }
+
+          // Check for anomaly alert notifications
+          const anomalyData = parseAnomalyAlertNotification(notification);
+          if (anomalyData) {
+            Alert.alert(
+              'Buying Opportunity Detected',
+              `Bitcoin ${anomalyData.priceChange > 0 ? 'surged' : 'dropped'} ${Math.abs(anomalyData.priceChange).toFixed(1)}%! ${anomalyData.successRate} of similar events led to gains.`,
+              [
+                {
+                  text: 'Buy Now',
+                  onPress: () => {
+                    navigationRef.current?.navigate('TradeExecution', {
+                      anomalyData,
+                    });
+                  },
+                },
+                { text: 'Dismiss', style: 'cancel' },
               ]
             );
           }
