@@ -22,7 +22,6 @@ const getCurrencySymbol = (currencyCode) => {
     'BUSD': 'BUSD',
     'AUD': 'A$',
     'BRL': 'R$',
-    'CAD': 'C$',
     'TRY': '₺',
     'TUSD': 'TUSD',
   };

@@ -8,7 +8,6 @@ export const SUPPORTED_CURRENCIES = [
   { code: 'BUSD', symbol: 'BUSD', name: 'Binance USD', binancePair: 'BTCBUSD' },
   { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', binancePair: 'BTCAUD' },
   { code: 'BRL', symbol: 'R$', name: 'Brazilian Real', binancePair: 'BTCBRL' },
-  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', binancePair: 'BTCCAD' },
   { code: 'TRY', symbol: '₺', name: 'Turkish Lira', binancePair: 'BTCTRY' },
   { code: 'TUSD', symbol: 'TUSD', name: 'TrueUSD', binancePair: 'BTCTUSD' }
 ];
