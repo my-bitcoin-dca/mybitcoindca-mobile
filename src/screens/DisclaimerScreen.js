@@ -29,7 +29,8 @@ export default function DisclaimerScreen({ onAccept }) {
 
   const handleScroll = ({ nativeEvent }) => {
     const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-    const paddingToBottom = 20;
+    // Increased threshold for Android compatibility
+    const paddingToBottom = 50;
     const isCloseToBottom =
       layoutMeasurement.height + contentOffset.y >=
       contentSize.height - paddingToBottom;
@@ -52,7 +53,7 @@ export default function DisclaimerScreen({ onAccept }) {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         onScroll={handleScroll}
-        scrollEventThrottle={400}
+        scrollEventThrottle={16}
       >
         {/* Not an Exchange */}
         <View style={styles.section}>
