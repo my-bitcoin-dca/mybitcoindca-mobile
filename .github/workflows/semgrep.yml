@@ -21,7 +21,7 @@ jobs:
     container:
       image: semgrep/semgrep
 
-    if: (github.event_name != 'schedule') || (github.repository == 'matthill500/mybitcoindca')
+    if: (github.event_name != 'schedule') || (github.repository == 'my-bitcoin-dca/mybitcoindca-mobile')
 
     steps:
       - name: Checkout code
