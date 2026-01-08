@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   Switch,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
@@ -575,6 +576,37 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.deleteButtonText}>Delete My Account</Text>
           </TouchableOpacity>
         </View>
+
+        <Text style={styles.sectionTitle}>About</Text>
+
+        {/* Visit Website */}
+        <TouchableOpacity
+          style={styles.inputGroup}
+          onPress={() => Linking.openURL('https://www.mybitcoindca.com')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.settingRow}>
+            <View style={styles.settingLeft}>
+              <Ionicons
+                name="globe-outline"
+                size={24}
+                color={colors.secondary}
+                style={styles.settingIcon}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Visit Website</Text>
+                <Text style={styles.description}>
+                  Learn more about My Bitcoin DCA
+                </Text>
+              </View>
+            </View>
+            <Ionicons
+              name="open-outline"
+              size={20}
+              color={colors.textTertiary}
+            />
+          </View>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -628,7 +660,7 @@ const createStyles = (colors) => StyleSheet.create({
     flex: 1,
   },
   settingIcon: {
-    marginRight: 12,
+    marginRight: 14,
   },
   label: {
     fontSize: 16,

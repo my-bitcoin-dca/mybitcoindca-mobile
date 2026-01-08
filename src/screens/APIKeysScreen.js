@@ -8,7 +8,9 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Linking,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import {
   storeBinanceKeys,
   hasBinanceKeys,
@@ -224,6 +226,23 @@ export default function APIKeysScreen({ navigation }) {
         </View>
       )}
 
+      <TouchableOpacity
+        style={styles.manualCard}
+        onPress={() => Linking.openURL('https://www.mybitcoindca.com/the-manual')}
+        activeOpacity={0.7}
+      >
+        <View style={styles.manualContent}>
+          <Ionicons name="book-outline" size={24} color={colors.primary} />
+          <View style={styles.manualTextContainer}>
+            <Text style={styles.manualTitle}>The Manual</Text>
+            <Text style={styles.manualSubtitle}>
+              A Step-by-step setup guide
+            </Text>
+          </View>
+          <Ionicons name="open-outline" size={20} color={colors.textTertiary} />
+        </View>
+      </TouchableOpacity>
+
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>💡 App Withdrawal Mode</Text>
         <Text style={styles.infoText}>
@@ -241,7 +260,7 @@ export default function APIKeysScreen({ navigation }) {
       </View>
 
       <View style={styles.instructionsCard}>
-        <Text style={styles.instructionsTitle}>How to get your API keys:</Text>
+        <Text style={styles.instructionsTitle}>(Quick guide) How to get your API keys:</Text>
         <Text style={styles.instructionsText}>
           1. Log in to Binance.com
         </Text>
@@ -449,5 +468,33 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginBottom: 8,
+  },
+  manualCard: {
+    backgroundColor: colors.cardBackground,
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 10,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  manualContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  manualTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  manualTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  manualSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 });

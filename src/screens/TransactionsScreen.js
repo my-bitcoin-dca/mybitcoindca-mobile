@@ -7,7 +7,10 @@ import {
   RefreshControl,
   ActivityIndicator,
   Platform,
+  TouchableOpacity,
+  Linking,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { dcaAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -164,6 +167,23 @@ export default function TransactionsScreen() {
         </Text>
       </View>
 
+      <TouchableOpacity
+        style={styles.dashboardCard}
+        onPress={() => Linking.openURL('https://www.mybitcoindca.com/dashboard')}
+        activeOpacity={0.7}
+      >
+        <View style={styles.dashboardContent}>
+          <Ionicons name="bar-chart-outline" size={24} color={colors.primary} />
+          <View style={styles.dashboardTextContainer}>
+            <Text style={styles.dashboardTitle}>View Dashboard</Text>
+            <Text style={styles.dashboardSubtitle}>
+              See your DCA performance charts on the web
+            </Text>
+          </View>
+          <Ionicons name="open-outline" size={20} color={colors.textTertiary} />
+        </View>
+      </TouchableOpacity>
+
       <FlatList
         data={allItems}
         renderItem={({ item }) =>
@@ -281,5 +301,32 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  dashboardCard: {
+    backgroundColor: colors.cardBackground,
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  dashboardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dashboardTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  dashboardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  dashboardSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 });
