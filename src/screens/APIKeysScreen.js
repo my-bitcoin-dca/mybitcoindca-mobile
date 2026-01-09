@@ -228,7 +228,7 @@ export default function APIKeysScreen({ navigation }) {
 
       <TouchableOpacity
         style={styles.manualCard}
-        onPress={() => Linking.openURL('https://www.mybitcoindca.com/the-manual')}
+        onPress={() => Linking.openURL('https://www.mybitcoindca.com/manual')}
         activeOpacity={0.7}
       >
         <View style={styles.manualContent}>
