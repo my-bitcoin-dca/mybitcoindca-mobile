@@ -184,6 +184,35 @@ export const authAPI = {
     const response = await api.delete('/auth/account');
     return response.data;
   },
+
+  // Passcode API methods
+  getPasscodeStatus: async () => {
+    const response = await api.get('/auth/passcode/status');
+    return response.data;
+  },
+
+  setPasscode: async (passcode) => {
+    const response = await api.post('/auth/passcode', { passcode });
+    return response.data;
+  },
+
+  verifyPasscode: async (passcode) => {
+    const response = await api.post('/auth/passcode/verify', { passcode });
+    return response.data;
+  },
+
+  requestPasscodeReset: async () => {
+    const response = await api.post('/auth/passcode/reset');
+    return response.data;
+  },
+
+  confirmPasscodeReset: async (token, newPasscode) => {
+    const response = await axios.post(`${AUTH_URL}/passcode/reset/confirm`, {
+      token,
+      newPasscode,
+    });
+    return response.data;
+  },
 };
 
 // DCA API calls

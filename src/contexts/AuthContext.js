@@ -140,7 +140,6 @@ export const AuthProvider = ({ children }) => {
     } finally {
       await storage.deleteItem('accessToken');
       await storage.deleteItem('disclaimer_accepted');
-      await storage.deleteItem('app_passcode');
       setUser(null);
       setIsAuthenticated(false);
       setPasscodeLocked(true);
@@ -148,21 +147,61 @@ export const AuthProvider = ({ children }) => {
   };
 
   const unlockWithPasscode = async (passcode) => {
-    const storedPasscode = await storage.getItem('app_passcode');
-    if (storedPasscode === passcode) {
-      setPasscodeLocked(false);
-      return true;
+    try {
+      const response = await authAPI.verifyPasscode(passcode);
+      if (response.success) {
+        setPasscodeLocked(false);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Passcode verification failed:', error);
+      return false;
     }
-    return false;
   };
 
   const setPasscode = async (passcode) => {
-    await storage.setItem('app_passcode', passcode);
+    try {
+      const response = await authAPI.setPasscode(passcode);
+      return response.success;
+    } catch (error) {
+      console.error('Failed to set passcode:', error);
+      return false;
+    }
   };
 
   const hasPasscode = async () => {
-    const passcode = await storage.getItem('app_passcode');
-    return !!passcode;
+    try {
+      const response = await authAPI.getPasscodeStatus();
+      return response.success && response.data.hasPasscode;
+    } catch (error) {
+      console.error('Failed to check passcode status:', error);
+      return false;
+    }
+  };
+
+  const requestPasscodeReset = async () => {
+    try {
+      const response = await authAPI.requestPasscodeReset();
+      return { success: response.success, message: response.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to send reset email',
+      };
+    }
+  };
+
+  const confirmPasscodeReset = async (token, newPasscode) => {
+    try {
+      const response = await authAPI.confirmPasscodeReset(token, newPasscode);
+      return { success: response.success, message: response.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to reset passcode',
+      };
+    }
   };
 
   const lockApp = () => {
@@ -205,6 +244,8 @@ export const AuthProvider = ({ children }) => {
         hasPasscode,
         lockApp,
         checkAuth,
+        requestPasscodeReset,
+        confirmPasscodeReset,
       }}
     >
       {children}

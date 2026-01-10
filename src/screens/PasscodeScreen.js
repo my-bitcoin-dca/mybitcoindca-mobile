@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,11 @@ import {
   TouchableOpacity,
   Alert,
   Vibration,
+  TextInput,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -16,7 +21,14 @@ export default function PasscodeScreen({ route }) {
   const [passcode, setPasscode] = useState('');
   const [confirmPasscode, setConfirmPasscode] = useState('');
   const [step, setStep] = useState(mode === 'setup' ? 'enter' : 'unlock');
-  const { unlockWithPasscode, setPasscode: savePasscode } = useAuth();
+  const [resetToken, setResetToken] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const {
+    unlockWithPasscode,
+    setPasscode: savePasscode,
+    requestPasscodeReset,
+    confirmPasscodeReset,
+  } = useAuth();
 
   const handleNumberPress = (num) => {
     if (step === 'unlock' && passcode.length < 6) {
@@ -56,10 +68,78 @@ export default function PasscodeScreen({ route }) {
   };
 
   const saveNewPasscode = async (code) => {
-    await savePasscode(code);
-    // Unlock the app after setting up passcode
-    await unlockWithPasscode(code);
-    Alert.alert('Success', 'Passcode set successfully');
+    setIsLoading(true);
+    const success = await savePasscode(code);
+    setIsLoading(false);
+    if (success) {
+      // Unlock the app after setting up passcode
+      await unlockWithPasscode(code);
+      Alert.alert('Success', 'Passcode set successfully');
+    } else {
+      Alert.alert('Error', 'Failed to set passcode. Please try again.');
+      setPasscode('');
+      setConfirmPasscode('');
+      setStep('enter');
+    }
+  };
+
+  const handleForgotPasscode = async () => {
+    setIsLoading(true);
+    const result = await requestPasscodeReset();
+    setIsLoading(false);
+    if (result.success) {
+      Alert.alert(
+        'Reset Email Sent',
+        'Check your email for a reset code. Enter it below to reset your passcode.',
+        [{ text: 'OK', onPress: () => setStep('reset_enter_token') }]
+      );
+    } else {
+      Alert.alert('Error', result.message);
+    }
+  };
+
+  const handleResetConfirm = async () => {
+    if (!resetToken.trim()) {
+      Alert.alert('Error', 'Please enter the reset code from your email');
+      return;
+    }
+    if (passcode.length !== 6) {
+      Alert.alert('Error', 'Please enter a 6-digit passcode');
+      return;
+    }
+    if (passcode !== confirmPasscode) {
+      Alert.alert('Error', 'Passcodes do not match');
+      setPasscode('');
+      setConfirmPasscode('');
+      return;
+    }
+
+    setIsLoading(true);
+    const result = await confirmPasscodeReset(resetToken.trim(), passcode);
+    setIsLoading(false);
+
+    if (result.success) {
+      Alert.alert('Success', 'Passcode has been reset!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setStep('unlock');
+            setPasscode('');
+            setConfirmPasscode('');
+            setResetToken('');
+          },
+        },
+      ]);
+    } else {
+      Alert.alert('Error', result.message);
+    }
+  };
+
+  const handleBackToUnlock = () => {
+    setStep('unlock');
+    setPasscode('');
+    setConfirmPasscode('');
+    setResetToken('');
   };
 
   const handleDelete = () => {
@@ -84,19 +164,99 @@ export default function PasscodeScreen({ route }) {
   const getTitle = () => {
     if (step === 'unlock') return 'Enter Passcode';
     if (step === 'enter') return 'Create Passcode';
+    if (step === 'confirm') return 'Confirm Passcode';
+    if (step === 'reset_enter_token') return 'Reset Passcode';
     return 'Confirm Passcode';
+  };
+
+  const getSubtitle = () => {
+    if (step === 'unlock') return 'Enter your 6-digit passcode to continue';
+    if (step === 'enter') return 'Create a 6-digit passcode to secure your app';
+    if (step === 'confirm') return 'Re-enter your passcode to confirm';
+    if (step === 'reset_enter_token') return 'Enter the reset code from your email and create a new passcode';
+    return '';
   };
 
   const styles = createStyles(colors);
 
+  // Show loading overlay
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Please wait...</Text>
+      </View>
+    );
+  }
+
+  // Reset passcode flow UI
+  if (step === 'reset_enter_token') {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.resetContainer}>
+          <Text style={styles.title}>{getTitle()}</Text>
+          <Text style={styles.subtitle}>{getSubtitle()}</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Reset Code (from email)</Text>
+            <TextInput
+              style={styles.input}
+              value={resetToken}
+              onChangeText={setResetToken}
+              placeholder="Paste reset code here"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>New Passcode (6 digits)</Text>
+            <TextInput
+              style={styles.input}
+              value={passcode}
+              onChangeText={(text) => setPasscode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+              placeholder="Enter 6-digit passcode"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="number-pad"
+              secureTextEntry
+              maxLength={6}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Confirm Passcode</Text>
+            <TextInput
+              style={styles.input}
+              value={confirmPasscode}
+              onChangeText={(text) => setConfirmPasscode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+              placeholder="Re-enter 6-digit passcode"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="number-pad"
+              secureTextEntry
+              maxLength={6}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.continueButton} onPress={handleResetConfirm}>
+            <Text style={styles.continueButtonText}>Reset Passcode</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.backButton} onPress={handleBackToUnlock}>
+            <Text style={styles.backButtonText}>Back to Unlock</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{getTitle()}</Text>
-      <Text style={styles.subtitle}>
-        {step === 'unlock'
-          ? 'Enter your 6-digit passcode to continue'
-          : 'Create a 6-digit passcode to secure your app'}
-      </Text>
+      <Text style={styles.subtitle}>{getSubtitle()}</Text>
 
       <View style={styles.dotsContainer}>
         {[...Array(6)].map((_, index) => (
@@ -138,6 +298,12 @@ export default function PasscodeScreen({ route }) {
       {step === 'enter' && passcode.length === 6 && (
         <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
           <Text style={styles.continueButtonText}>Continue</Text>
+        </TouchableOpacity>
+      )}
+
+      {step === 'unlock' && (
+        <TouchableOpacity style={styles.forgotButton} onPress={handleForgotPasscode}>
+          <Text style={styles.forgotButtonText}>Forgot Passcode?</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -216,5 +382,54 @@ const createStyles = (colors) => StyleSheet.create({
     color: colors.cardBackground,
     fontSize: 18,
     fontWeight: '600',
+  },
+  forgotButton: {
+    marginTop: 30,
+    alignItems: 'center',
+  },
+  forgotButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: colors.textSecondary,
+    fontSize: 16,
+  },
+  resetContainer: {
+    flexGrow: 1,
+    padding: 20,
+    justifyContent: 'center',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border || colors.textSecondary + '30',
+  },
+  backButton: {
+    marginTop: 16,
+    padding: 12,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: colors.textSecondary,
+    fontSize: 16,
   },
 });
