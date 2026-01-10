@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,13 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID } from '../utils/config';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function RegisterScreen({ navigation }) {
   const { colors } = useTheme();
@@ -19,7 +24,49 @@ export default function RegisterScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { register, googleLogin } = useAuth();
+
+  // Configure Google Auth Request
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: GOOGLE_WEB_CLIENT_ID,
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+  });
+
+  // Handle Google auth response
+  useEffect(() => {
+    if (response?.type === 'success') {
+      handleGoogleResponse(response.params.id_token);
+    } else if (response?.type === 'error') {
+      setGoogleLoading(false);
+      Alert.alert('Google Sign-Up Failed', 'Please try again');
+    } else if (response?.type === 'dismiss') {
+      setGoogleLoading(false);
+    }
+  }, [response]);
+
+  const handleGoogleResponse = async (idToken) => {
+    try {
+      const result = await googleLogin(idToken);
+      setGoogleLoading(false);
+      if (!result.success) {
+        Alert.alert('Sign-Up Failed', result.message || 'Google sign-up failed');
+      }
+    } catch (error) {
+      setGoogleLoading(false);
+      Alert.alert('Error', 'Failed to complete Google sign-up');
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    if (!GOOGLE_WEB_CLIENT_ID) {
+      Alert.alert('Configuration Error', 'Google Sign-In is not configured');
+      return;
+    }
+    setGoogleLoading(true);
+    promptAsync();
+  };
 
   const validatePassword = (pass) => {
     const requirements = {
@@ -151,12 +198,33 @@ export default function RegisterScreen({ navigation }) {
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleRegister}
-              disabled={loading}
+              disabled={loading || googleLoading}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.buttonText}>Create Account</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.dividerContainer}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.divider} />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
+              onPress={handleGoogleSignup}
+              disabled={loading || googleLoading || !request}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color={colors.text} />
+              ) : (
+                <>
+                  <Text style={styles.googleIcon}>G</Text>
+                  <Text style={styles.googleButtonText}>Continue with Google</Text>
+                </>
               )}
             </TouchableOpacity>
           </View>
@@ -248,6 +316,42 @@ const createStyles = (colors) => StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.cardBackground,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  googleIcon: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4285F4',
+    marginRight: 12,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
   },
   footer: {
     flexDirection: 'row',

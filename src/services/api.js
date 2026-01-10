@@ -106,6 +106,15 @@ export const authAPI = {
     return response.data;
   },
 
+  googleLogin: async (idToken) => {
+    const response = await axios.post(`${AUTH_URL}/google`, {
+      idToken,
+    }, {
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
   requestPasswordReset: async (email) => {
     const response = await axios.post(`${AUTH_URL}/forgot-password`, {
       email,

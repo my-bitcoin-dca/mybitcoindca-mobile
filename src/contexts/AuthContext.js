@@ -76,6 +76,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const googleLogin = async (idToken) => {
+    try {
+      const response = await authAPI.googleLogin(idToken);
+      if (response.success) {
+        await storage.setItem('accessToken', response.data.accessToken);
+        setUser(response.data.user);
+        setIsAuthenticated(true);
+        // Register push notifications after successful Google login
+        await registerPushToken();
+        return { success: true };
+      }
+      return { success: false, message: response.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Google login failed',
+      };
+    }
+  };
+
   const requestPasswordReset = async (email) => {
     try {
       const response = await authAPI.requestPasswordReset(email);
@@ -175,6 +195,7 @@ export const AuthProvider = ({ children }) => {
         passcodeLocked,
         login,
         register,
+        googleLogin,
         logout,
         requestPasswordReset,
         verifyResetToken,
