@@ -9,13 +9,10 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '../utils/config';
-
-WebBrowser.maybeCompleteAuthSession();
 
 export default function RegisterScreen({ navigation }) {
   const { colors } = useTheme();
@@ -27,46 +24,47 @@ export default function RegisterScreen({ navigation }) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const { register, googleLogin } = useAuth();
 
-  // Configure Google Auth Request
-  // Using web client ID for Android since expo-auth-session uses redirect flow
-  // (Android-type OAuth clients don't support custom URI schemes)
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: GOOGLE_WEB_CLIENT_ID,
-    iosClientId: GOOGLE_IOS_CLIENT_ID,
-  });
-
-  // Handle Google auth response
+  // Configure Google Sign-In on mount
   useEffect(() => {
-    if (response?.type === 'success') {
-      handleGoogleResponse(response.params.id_token);
-    } else if (response?.type === 'error') {
-      setGoogleLoading(false);
-      Alert.alert('Google Sign-Up Failed', 'Please try again');
-    } else if (response?.type === 'dismiss') {
-      setGoogleLoading(false);
-    }
-  }, [response]);
-
-  const handleGoogleResponse = async (idToken) => {
-    try {
-      const result = await googleLogin(idToken);
-      setGoogleLoading(false);
-      if (!result.success) {
-        Alert.alert('Sign-Up Failed', result.message || 'Google sign-up failed');
-      }
-    } catch (error) {
-      setGoogleLoading(false);
-      Alert.alert('Error', 'Failed to complete Google sign-up');
-    }
-  };
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      iosClientId: GOOGLE_IOS_CLIENT_ID,
+    });
+  }, []);
 
   const handleGoogleSignup = async () => {
     if (!GOOGLE_WEB_CLIENT_ID) {
       Alert.alert('Configuration Error', 'Google Sign-In is not configured');
       return;
     }
+
     setGoogleLoading(true);
-    promptAsync();
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+
+      if (response.data?.idToken) {
+        const result = await googleLogin(response.data.idToken);
+        if (!result.success) {
+          Alert.alert('Sign-Up Failed', result.message || 'Google sign-up failed');
+        }
+      } else {
+        Alert.alert('Google Sign-Up Failed', 'No ID token received');
+      }
+    } catch (error) {
+      console.log('Google Sign-In Error:', error.code, error.message);
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // User cancelled
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        // Sign in already in progress
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert('Error', 'Google Play Services not available');
+      } else {
+        Alert.alert('Google Sign-Up Failed', error.message || 'Please try again');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   const validatePassword = (pass) => {
@@ -217,7 +215,7 @@ export default function RegisterScreen({ navigation }) {
             <TouchableOpacity
               style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
               onPress={handleGoogleSignup}
-              disabled={loading || googleLoading || !request}
+              disabled={loading || googleLoading}
             >
               {googleLoading ? (
                 <ActivityIndicator color={colors.text} />
