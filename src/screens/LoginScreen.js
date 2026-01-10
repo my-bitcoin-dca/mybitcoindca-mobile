@@ -15,7 +15,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID } from '../utils/config';
+import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '../utils/config';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -28,10 +28,11 @@ export default function LoginScreen({ navigation }) {
   const { login, googleLogin } = useAuth();
 
   // Configure Google Auth Request
+  // Using web client ID for Android since expo-auth-session uses redirect flow
+  // (Android-type OAuth clients don't support custom URI schemes)
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     clientId: GOOGLE_WEB_CLIENT_ID,
     iosClientId: GOOGLE_IOS_CLIENT_ID,
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
   });
 
   // Handle Google auth response
