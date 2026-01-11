@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { hasBinanceKeys } from '../services/binanceService';
+import { hasExchangeKeys, getSelectedExchange } from '../services/exchangeService';
 import { useFocusEffect } from '@react-navigation/native';
 
 export default function HomeScreen({ navigation }) {
@@ -32,7 +32,8 @@ export default function HomeScreen({ navigation }) {
   );
 
   const checkSetup = async () => {
-    const keys = await hasBinanceKeys();
+    const exchange = await getSelectedExchange();
+    const keys = await hasExchangeKeys(exchange);
     setHasKeys(keys);
   };
 
@@ -78,7 +79,7 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.setupTextContainer}>
             <Text style={styles.setupTitle}>Setup Required</Text>
             <Text style={styles.setupText}>
-              Configure your Binance API keys to enable withdrawals. Tap the "Keys" tab below to get started.
+              Configure your exchange API keys to enable trading and withdrawals. Tap the "Keys" tab below to get started.
             </Text>
           </View>
         </View>
@@ -96,7 +97,7 @@ export default function HomeScreen({ navigation }) {
           3. Tap the notification and confirm to execute the market buy order
         </Text>
         <Text style={styles.infoText}>
-          4. BTC accumulates on Binance until withdrawal time
+          4. BTC accumulates on your exchange until withdrawal time
         </Text>
         <Text style={styles.infoText}>
           5. On the last Friday of every month, approve withdrawal to your hardware wallet

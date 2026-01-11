@@ -12,29 +12,78 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  storeBinanceKeys,
-  hasBinanceKeys,
-  deleteBinanceKeys,
+  EXCHANGES,
+  getExchangeInfo,
+  getSelectedExchange,
+  setSelectedExchange,
+  storeExchangeKeys,
+  hasExchangeKeys,
+  deleteExchangeKeys,
   getAccountBalances,
-} from '../services/binanceService';
+  getApiKeyInstructions,
+  getWithdrawalNotes,
+} from '../services/exchangeService';
+import { authAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function APIKeysScreen({ navigation }) {
   const { colors } = useTheme();
+  const [selectedExchangeId, setSelectedExchangeId] = useState('binance');
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
   const [hasKeys, setHasKeys] = useState(false);
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [showSecrets, setShowSecrets] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  useEffect(() => {
+    loadExchangeSettings();
+  }, []);
 
   useEffect(() => {
     checkKeys();
-  }, []);
+  }, [selectedExchangeId]);
+
+  const loadExchangeSettings = async () => {
+    try {
+      // Load from server settings
+      const response = await authAPI.getSettings();
+      if (response.success && response.data?.settings?.exchange) {
+        setSelectedExchangeId(response.data.settings.exchange);
+      } else {
+        // Fall back to local storage
+        const stored = await getSelectedExchange();
+        setSelectedExchangeId(stored);
+      }
+    } catch (error) {
+      console.error('Error loading exchange settings:', error);
+      const stored = await getSelectedExchange();
+      setSelectedExchangeId(stored);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
 
   const checkKeys = async () => {
-    const exists = await hasBinanceKeys();
+    const exists = await hasExchangeKeys(selectedExchangeId);
     setHasKeys(exists);
+  };
+
+  const handleExchangeChange = async (exchangeId) => {
+    setSelectedExchangeId(exchangeId);
+    await setSelectedExchange(exchangeId);
+
+    // Save to server
+    try {
+      await authAPI.updateSettings({ exchange: exchangeId });
+    } catch (error) {
+      console.error('Error saving exchange setting:', error);
+    }
+
+    // Clear input fields when switching exchanges
+    setApiKey('');
+    setApiSecret('');
   };
 
   const handleSaveKeys = async () => {
@@ -45,11 +94,12 @@ export default function APIKeysScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await storeBinanceKeys(apiKey.trim(), apiSecret.trim());
+      await storeExchangeKeys(selectedExchangeId, apiKey.trim(), apiSecret.trim());
       setHasKeys(true);
       setApiKey('');
       setApiSecret('');
-      Alert.alert('Success', 'Binance API keys saved securely on your device');
+      const exchangeName = getExchangeInfo(selectedExchangeId).name;
+      Alert.alert('Success', `${exchangeName} API keys saved securely on your device`);
     } catch (error) {
       Alert.alert('Error', 'Failed to save API keys');
     } finally {
@@ -60,15 +110,16 @@ export default function APIKeysScreen({ navigation }) {
   const handleTestKeys = async () => {
     setTesting(true);
     try {
-      const result = await getAccountBalances();
+      const result = await getAccountBalances(selectedExchangeId);
       if (result.success) {
+        const exchangeName = getExchangeInfo(selectedExchangeId).name;
         Alert.alert(
           'Success',
-          'API keys are valid! Connected to Binance successfully.',
+          `API keys are valid! Connected to ${exchangeName} successfully.`,
           [{ text: 'OK' }]
         );
       } else {
-        Alert.alert('Error', 'Invalid API keys or connection failed');
+        Alert.alert('Error', result.error || 'Invalid API keys or connection failed');
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to test API keys');
@@ -78,16 +129,17 @@ export default function APIKeysScreen({ navigation }) {
   };
 
   const handleDeleteKeys = () => {
+    const exchangeName = getExchangeInfo(selectedExchangeId).name;
     Alert.alert(
       'Delete API Keys',
-      'Are you sure you want to delete your Binance API keys? You will need to re-enter them to approve withdrawals.',
+      `Are you sure you want to delete your ${exchangeName} API keys? You will need to re-enter them to approve trades and withdrawals.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await deleteBinanceKeys();
+            await deleteExchangeKeys(selectedExchangeId);
             setHasKeys(false);
             Alert.alert('Deleted', 'API keys have been removed');
           },
@@ -96,15 +148,61 @@ export default function APIKeysScreen({ navigation }) {
     );
   };
 
+  const exchangeInfo = getExchangeInfo(selectedExchangeId);
+  const instructions = getApiKeyInstructions(selectedExchangeId);
+  const withdrawalNotes = getWithdrawalNotes(selectedExchangeId);
+
   const styles = createStyles(colors);
+
+  if (initialLoading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Binance API Keys</Text>
+        <Text style={styles.title}>Exchange API Keys</Text>
         <Text style={styles.subtitle}>
-          Securely store your Binance API keys on YOUR device
+          Securely store your exchange API keys on YOUR device
         </Text>
+      </View>
+
+      {/* Exchange Selector */}
+      <View style={styles.exchangeSelector}>
+        <Text style={styles.sectionTitle}>Select Exchange</Text>
+        <View style={styles.exchangeButtons}>
+          {EXCHANGES.map((exchange) => (
+            <TouchableOpacity
+              key={exchange.id}
+              style={[
+                styles.exchangeButton,
+                selectedExchangeId === exchange.id && styles.exchangeButtonActive,
+              ]}
+              onPress={() => handleExchangeChange(exchange.id)}
+            >
+              <Text
+                style={[
+                  styles.exchangeButtonText,
+                  selectedExchangeId === exchange.id && styles.exchangeButtonTextActive,
+                ]}
+              >
+                {exchange.name}
+              </Text>
+              <Text
+                style={[
+                  styles.exchangeButtonDesc,
+                  selectedExchangeId === exchange.id && styles.exchangeButtonDescActive,
+                ]}
+              >
+                {exchange.description}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       <View style={styles.infoCard}>
@@ -141,7 +239,7 @@ export default function APIKeysScreen({ navigation }) {
           • This app does NOT hold or custody your funds
         </Text>
         <Text style={styles.disclaimerText}>
-          • Trades execute directly on YOUR Binance account
+          • Trades execute directly on YOUR {exchangeInfo.name} account
         </Text>
       </View>
 
@@ -149,7 +247,7 @@ export default function APIKeysScreen({ navigation }) {
         <View style={styles.card}>
           <View style={styles.statusContainer}>
             <View style={styles.statusDot} />
-            <Text style={styles.statusText}>API Keys Configured</Text>
+            <Text style={styles.statusText}>{exchangeInfo.name} API Keys Configured</Text>
           </View>
 
           <TouchableOpacity
@@ -173,13 +271,13 @@ export default function APIKeysScreen({ navigation }) {
         </View>
       ) : (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Enter Your Binance API Keys</Text>
+          <Text style={styles.cardTitle}>Enter Your {exchangeInfo.name} API Keys</Text>
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>API Key</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter your Binance API key"
+              placeholder={`Enter your ${exchangeInfo.name} API key`}
               placeholderTextColor={colors.textTertiary}
               value={apiKey}
               onChangeText={setApiKey}
@@ -190,10 +288,12 @@ export default function APIKeysScreen({ navigation }) {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>API Secret</Text>
+            <Text style={styles.label}>
+              {selectedExchangeId === 'kraken' ? 'Private Key' : 'API Secret'}
+            </Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter your Binance API secret"
+              placeholder={`Enter your ${exchangeInfo.name} ${selectedExchangeId === 'kraken' ? 'private key' : 'API secret'}`}
               placeholderTextColor={colors.textTertiary}
               value={apiSecret}
               onChangeText={setApiSecret}
@@ -249,7 +349,7 @@ export default function APIKeysScreen({ navigation }) {
           • Turn OFF App Withdrawal Mode in Settings to avoid granting withdrawal permissions to your API keys
         </Text>
         <Text style={styles.infoText}>
-          • With App Withdrawal Mode OFF: Do NOT enable "Enable Withdrawals" in Binance API settings
+          • With App Withdrawal Mode OFF: Do NOT enable withdrawal permissions in {exchangeInfo.name} API settings
         </Text>
         <Text style={styles.infoText}>
           • You'll receive withdrawal instructions with copy buttons instead of automatic execution
@@ -259,30 +359,40 @@ export default function APIKeysScreen({ navigation }) {
         </Text>
       </View>
 
+      {selectedExchangeId === 'kraken' && (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningTitle}>📝 {withdrawalNotes.title}</Text>
+          {withdrawalNotes.notes.map((note, index) => (
+            <Text key={index} style={styles.warningText}>• {note}</Text>
+          ))}
+        </View>
+      )}
+
       <View style={styles.instructionsCard}>
-        <Text style={styles.instructionsTitle}>(Quick guide) How to get your API keys:</Text>
-        <Text style={styles.instructionsText}>
-          1. Log in to Binance.com
-        </Text>
-        <Text style={styles.instructionsText}>
-          2. Go to Profile → API Management
-        </Text>
-        <Text style={styles.instructionsText}>
-          3. Create a new API key
-        </Text>
-        <Text style={styles.instructionsText}>
-          4. Enable "Enable Spot & Margin Trading" (required)
-        </Text>
-        <Text style={styles.instructionsText}>
-          5. Enable "Enable Withdrawals" ONLY if App Withdrawal Mode is ON
-        </Text>
-        <Text style={styles.instructionsText}>
-          6. Do NOT enable "Enable Withdrawals" if App Withdrawal Mode is OFF
-        </Text>
-        <Text style={styles.instructionsText}>
-          7. Whitelist a dedicated IP (recommended: use a VPN service with a static IP)
-        </Text>
+        <Text style={styles.instructionsTitle}>(Quick guide) How to get your {exchangeInfo.name} API keys:</Text>
+        {instructions.map((instruction, index) => (
+          <Text key={index} style={styles.instructionsText}>{instruction}</Text>
+        ))}
       </View>
+
+      <TouchableOpacity
+        style={styles.linkCard}
+        onPress={() => Linking.openURL(exchangeInfo.apiDocsUrl)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.linkContent}>
+          <Ionicons name="key-outline" size={24} color={colors.primary} />
+          <View style={styles.linkTextContainer}>
+            <Text style={styles.linkTitle}>Open {exchangeInfo.name} API Settings</Text>
+            <Text style={styles.linkSubtitle}>
+              Create or manage your API keys
+            </Text>
+          </View>
+          <Ionicons name="open-outline" size={20} color={colors.textTertiary} />
+        </View>
+      </TouchableOpacity>
+
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
@@ -291,6 +401,10 @@ const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     padding: 20,
@@ -307,6 +421,48 @@ const createStyles = (colors) => StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  exchangeSelector: {
+    padding: 20,
+    paddingBottom: 0,
+  },
+  exchangeButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  exchangeButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.cardBackground,
+  },
+  exchangeButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '10',
+  },
+  exchangeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  exchangeButtonTextActive: {
+    color: colors.primary,
+  },
+  exchangeButtonDesc: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  exchangeButtonDescActive: {
+    color: colors.primary,
   },
   infoCard: {
     backgroundColor: '#E3F2FD',
@@ -345,6 +501,26 @@ const createStyles = (colors) => StyleSheet.create({
   disclaimerText: {
     fontSize: 14,
     color: '#856404',
+    marginBottom: 4,
+  },
+  warningCard: {
+    backgroundColor: '#FCE4EC',
+    marginHorizontal: 20,
+    marginBottom: 10,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F8BBD9',
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#880E4F',
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#AD1457',
     marginBottom: 4,
   },
   card: {
@@ -453,8 +629,8 @@ const createStyles = (colors) => StyleSheet.create({
     backgroundColor: colors.cardBackground,
     marginRight: 20,
     marginLeft: 20,
-    marginTop: 0,
-    marginBottom: 40,
+    marginTop: 10,
+    marginBottom: 10,
     padding: 16,
     borderRadius: 12,
   },
@@ -494,6 +670,34 @@ const createStyles = (colors) => StyleSheet.create({
     marginBottom: 2,
   },
   manualSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  linkCard: {
+    backgroundColor: colors.cardBackground,
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 10,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  linkContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  linkTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  linkTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  linkSubtitle: {
     fontSize: 14,
     color: colors.textSecondary,
   },

@@ -11,14 +11,23 @@ import {
   Platform,
   Switch,
   Linking,
+  Modal,
+  SafeAreaView,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
+import QRCode from 'react-native-qrcode-svg';
 import { authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '../utils/currency';
 import storage from '../utils/storage';
+
+const FREQUENCIES = [
+  { label: 'Weekly', value: 'weekly' },
+  { label: 'Bi-weekly', value: 'biweekly' },
+];
 
 const DAYS_OF_WEEK = [
   { label: 'Monday', value: 'monday' },
@@ -47,6 +56,7 @@ export default function SettingsScreen({ navigation }) {
   const [exchangeTradingFee, setExchangeTradingFee] = useState('0.1');
   const [walletAddress, setWalletAddress] = useState('');
   const [appWithdrawal, setAppWithdrawal] = useState(true);
+  const [selectedFrequency, setSelectedFrequency] = useState('weekly');
   const [selectedDay, setSelectedDay] = useState('thursday');
   const [selectedHour, setSelectedHour] = useState(8);
 
@@ -55,6 +65,14 @@ export default function SettingsScreen({ navigation }) {
   const [withdrawalReminders, setWithdrawalReminders] = useState(true);
   const [purchaseConfirmations, setPurchaseConfirmations] = useState(true);
 
+  // 2FA state
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [twoFactorSetupData, setTwoFactorSetupData] = useState(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [isDisabling2FA, setIsDisabling2FA] = useState(false);
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -62,15 +80,19 @@ export default function SettingsScreen({ navigation }) {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await authAPI.getSettings();
+      const [settingsResponse, twoFAResponse] = await Promise.all([
+        authAPI.getSettings(),
+        authAPI.get2FAStatus(),
+      ]);
 
-      if (response.success) {
-        const { settings } = response.data;
+      if (settingsResponse.success) {
+        const { settings } = settingsResponse.data;
         setCurrency(settings.currency || 'EUR');
         setWeeklyDcaAmount(settings.weeklyDcaAmount?.toString() || '35');
         setExchangeTradingFee(settings.exchangeTradingFee?.toString() || '0.1');
         setWalletAddress(settings.hardwareWalletAddress || '');
         setAppWithdrawal(settings.appWithdrawal ?? true);
+        setSelectedFrequency(settings.purchaseSchedule?.frequency || 'weekly');
         setSelectedDay(settings.purchaseSchedule?.dayOfWeek || 'thursday');
         setSelectedHour(settings.purchaseSchedule?.hour ?? 8);
 
@@ -78,6 +100,10 @@ export default function SettingsScreen({ navigation }) {
         setAnomalyAlerts(settings.notifications?.anomalyAlerts ?? true);
         setWithdrawalReminders(settings.notifications?.withdrawalReminders ?? true);
         setPurchaseConfirmations(settings.notifications?.purchaseConfirmations ?? true);
+      }
+
+      if (twoFAResponse.success) {
+        setTwoFactorEnabled(twoFAResponse.data.enabled);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -87,67 +113,90 @@ export default function SettingsScreen({ navigation }) {
     }
   };
 
-  const handleSave = async () => {
-    // Validate inputs
-    const amount = parseFloat(weeklyDcaAmount);
-    const fee = parseFloat(exchangeTradingFee);
-
-    if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Invalid Input', 'Please enter a valid weekly DCA amount');
-      return;
-    }
-
-    if (isNaN(fee) || fee < 0 || fee > 100) {
-      Alert.alert('Invalid Input', 'Trading fee must be between 0 and 100%');
-      return;
-    }
-
-    // Auto-trim wallet address
-    const trimmedWalletAddress = walletAddress.trim();
-
-    // Validate Bitcoin address with helpful error messages
-    const addressError = getBitcoinAddressError(walletAddress);
-    if (addressError) {
-      Alert.alert('Invalid Bitcoin Address', addressError);
-      return;
-    }
-
-    // Update state with trimmed address if it changed
-    if (walletAddress !== trimmedWalletAddress) {
-      setWalletAddress(trimmedWalletAddress);
-    }
-
+  // Auto-save settings whenever they change
+  const saveSettings = async (updates) => {
     try {
       setSaving(true);
-
-      const response = await authAPI.updateSettings({
-        currency: currency,
-        weeklyDcaAmount: amount,
-        exchangeTradingFee: fee,
-        hardwareWalletAddress: trimmedWalletAddress,
-        appWithdrawal: appWithdrawal,
-        purchaseSchedule: {
-          dayOfWeek: selectedDay,
-          hour: selectedHour,
-        },
-        notifications: {
-          anomalyAlerts: anomalyAlerts,
-          withdrawalReminders: withdrawalReminders,
-          purchaseConfirmations: purchaseConfirmations,
-        },
-      });
-
-      if (response.success) {
-        Alert.alert('Success', 'Settings saved successfully!');
-      } else {
-        Alert.alert('Error', response.message || 'Failed to save settings');
-      }
+      await authAPI.updateSettings(updates);
     } catch (error) {
       console.error('Error saving settings:', error);
       Alert.alert('Error', 'Failed to save settings');
     } finally {
       setSaving(false);
     }
+  };
+
+  // Handlers for immediate save on change
+  const handleCurrencyChange = async (value) => {
+    setCurrency(value);
+    await saveSettings({ currency: value });
+  };
+
+  const handleAppWithdrawalChange = async (value) => {
+    setAppWithdrawal(value);
+    await saveSettings({ appWithdrawal: value });
+  };
+
+  const handleFrequencyChange = async (value) => {
+    setSelectedFrequency(value);
+    await saveSettings({ purchaseSchedule: { frequency: value, dayOfWeek: selectedDay, hour: selectedHour } });
+  };
+
+  const handleDayChange = async (value) => {
+    setSelectedDay(value);
+    await saveSettings({ purchaseSchedule: { frequency: selectedFrequency, dayOfWeek: value, hour: selectedHour } });
+  };
+
+  const handleHourChange = async (value) => {
+    setSelectedHour(value);
+    await saveSettings({ purchaseSchedule: { frequency: selectedFrequency, dayOfWeek: selectedDay, hour: value } });
+  };
+
+  const handleAnomalyAlertsChange = async (value) => {
+    setAnomalyAlerts(value);
+    await saveSettings({ notifications: { anomalyAlerts: value, withdrawalReminders, purchaseConfirmations } });
+  };
+
+  const handleWithdrawalRemindersChange = async (value) => {
+    setWithdrawalReminders(value);
+    await saveSettings({ notifications: { anomalyAlerts, withdrawalReminders: value, purchaseConfirmations } });
+  };
+
+  const handlePurchaseConfirmationsChange = async (value) => {
+    setPurchaseConfirmations(value);
+    await saveSettings({ notifications: { anomalyAlerts, withdrawalReminders, purchaseConfirmations: value } });
+  };
+
+  // Save text fields on blur
+  const handleDcaAmountBlur = async () => {
+    const amount = parseFloat(weeklyDcaAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Invalid Input', 'Please enter a valid weekly DCA amount');
+      return;
+    }
+    await saveSettings({ weeklyDcaAmount: amount });
+  };
+
+  const handleTradingFeeBlur = async () => {
+    const fee = parseFloat(exchangeTradingFee);
+    if (isNaN(fee) || fee < 0 || fee > 100) {
+      Alert.alert('Invalid Input', 'Trading fee must be between 0 and 100%');
+      return;
+    }
+    await saveSettings({ exchangeTradingFee: fee });
+  };
+
+  const handleWalletAddressBlur = async () => {
+    const trimmedAddress = walletAddress.trim();
+    if (walletAddress !== trimmedAddress) {
+      setWalletAddress(trimmedAddress);
+    }
+    const addressError = getBitcoinAddressError(trimmedAddress);
+    if (addressError) {
+      Alert.alert('Invalid Bitcoin Address', addressError);
+      return;
+    }
+    await saveSettings({ hardwareWalletAddress: trimmedAddress });
   };
 
   const isValidBitcoinAddress = (address) => {
@@ -239,6 +288,84 @@ export default function SettingsScreen({ navigation }) {
     }
   };
 
+  // 2FA handlers
+  const handle2FAToggle = async (value) => {
+    if (value) {
+      // Enable 2FA - initiate setup
+      try {
+        setTwoFactorLoading(true);
+        const response = await authAPI.setup2FA();
+        if (response.success) {
+          setTwoFactorSetupData(response.data);
+          setIsDisabling2FA(false);
+          setTwoFactorCode('');
+          setShow2FAModal(true);
+        } else {
+          Alert.alert('Error', response.message || 'Failed to setup 2FA');
+        }
+      } catch (error) {
+        console.error('Error setting up 2FA:', error);
+        Alert.alert('Error', 'Failed to setup 2FA. Please try again.');
+      } finally {
+        setTwoFactorLoading(false);
+      }
+    } else {
+      // Disable 2FA - show verification modal
+      setIsDisabling2FA(true);
+      setTwoFactorCode('');
+      setShow2FAModal(true);
+    }
+  };
+
+  const handleConfirm2FA = async () => {
+    if (twoFactorCode.length !== 6) {
+      Alert.alert('Invalid Code', 'Please enter a 6-digit verification code.');
+      return;
+    }
+
+    try {
+      setTwoFactorLoading(true);
+
+      if (isDisabling2FA) {
+        // Disable 2FA
+        const response = await authAPI.disable2FA(twoFactorCode);
+        if (response.success) {
+          setTwoFactorEnabled(false);
+          setShow2FAModal(false);
+          setTwoFactorCode('');
+          setTwoFactorSetupData(null);
+          Alert.alert('Success', '2FA has been disabled for withdrawals.');
+        } else {
+          Alert.alert('Error', response.message || 'Invalid verification code.');
+        }
+      } else {
+        // Enable 2FA
+        const response = await authAPI.enable2FA(twoFactorCode);
+        if (response.success) {
+          setTwoFactorEnabled(true);
+          setShow2FAModal(false);
+          setTwoFactorCode('');
+          setTwoFactorSetupData(null);
+          Alert.alert('Success', '2FA has been enabled for withdrawals. You will need to enter a code from your authenticator app when approving withdrawals.');
+        } else {
+          Alert.alert('Error', response.message || 'Invalid verification code.');
+        }
+      }
+    } catch (error) {
+      console.error('Error confirming 2FA:', error);
+      Alert.alert('Error', 'Failed to verify code. Please try again.');
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
+  const handleClose2FAModal = () => {
+    setShow2FAModal(false);
+    setTwoFactorCode('');
+    setTwoFactorSetupData(null);
+    setIsDisabling2FA(false);
+  };
+
   const styles = createStyles(colors);
 
   if (loading) {
@@ -292,7 +419,7 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.inputContainer, styles.pickerContainer]}>
             <Picker
               selectedValue={currency}
-              onValueChange={(itemValue) => setCurrency(itemValue)}
+              onValueChange={handleCurrencyChange}
               style={styles.picker}
               dropdownIconColor={colors.text}
               itemStyle={Platform.OS === 'ios' ? styles.pickerItem : undefined}
@@ -308,11 +435,11 @@ export default function SettingsScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Weekly DCA Amount */}
+        {/* DCA Amount */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Weekly DCA Amount ({currency})</Text>
+          <Text style={styles.label}>DCA Amount ({currency})</Text>
           <Text style={styles.description}>
-            Amount in {currency} to purchase each week
+            Amount in {currency} to purchase {selectedFrequency === 'biweekly' ? 'every 2 weeks' : 'each week'}
           </Text>
           <View style={styles.inputContainer}>
             <Text style={styles.currencySymbol}>{getCurrencySymbol(currency)}</Text>
@@ -320,6 +447,7 @@ export default function SettingsScreen({ navigation }) {
               style={styles.input}
               value={weeklyDcaAmount}
               onChangeText={setWeeklyDcaAmount}
+              onBlur={handleDcaAmountBlur}
               keyboardType="decimal-pad"
               placeholder="35"
               placeholderTextColor={colors.textTertiary}
@@ -338,6 +466,7 @@ export default function SettingsScreen({ navigation }) {
               style={styles.input}
               value={exchangeTradingFee}
               onChangeText={setExchangeTradingFee}
+              onBlur={handleTradingFeeBlur}
               keyboardType="decimal-pad"
               placeholder="0.1"
               placeholderTextColor={colors.textTertiary}
@@ -350,8 +479,29 @@ export default function SettingsScreen({ navigation }) {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Purchase Schedule</Text>
           <Text style={styles.description}>
-            When to execute your weekly DCA purchase
+            When to execute your DCA purchases
           </Text>
+
+          <Text style={styles.subLabel}>Frequency</Text>
+          <View style={styles.frequencySelector}>
+            {FREQUENCIES.map((freq) => (
+              <TouchableOpacity
+                key={freq.value}
+                style={[
+                  styles.frequencyButton,
+                  selectedFrequency === freq.value && styles.frequencyButtonSelected
+                ]}
+                onPress={() => handleFrequencyChange(freq.value)}
+              >
+                <Text style={[
+                  styles.frequencyButtonText,
+                  selectedFrequency === freq.value && styles.frequencyButtonTextSelected
+                ]}>
+                  {freq.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <Text style={styles.subLabel}>Day of Week</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
@@ -362,7 +512,7 @@ export default function SettingsScreen({ navigation }) {
                   styles.dayButton,
                   selectedDay === day.value && styles.dayButtonSelected
                 ]}
-                onPress={() => setSelectedDay(day.value)}
+                onPress={() => handleDayChange(day.value)}
               >
                 <Text style={[
                   styles.dayButtonText,
@@ -383,7 +533,7 @@ export default function SettingsScreen({ navigation }) {
                   styles.timeButton,
                   selectedHour === hour.value && styles.timeButtonSelected
                 ]}
-                onPress={() => setSelectedHour(hour.value)}
+                onPress={() => handleHourChange(hour.value)}
               >
                 <Text style={[
                   styles.timeButtonText,
@@ -394,6 +544,12 @@ export default function SettingsScreen({ navigation }) {
               </TouchableOpacity>
             ))}
           </View>
+        </View>
+
+         <View style={styles.infoBox}>
+          <Text style={styles.infoText}>
+            ⓘ Your purchase schedule is in server time (UTC). You'll receive a notification to execute the trade at the scheduled time.
+          </Text>
         </View>
 
         <Text style={styles.sectionTitle}>Push Notifications</Text>
@@ -417,7 +573,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <Switch
               value={anomalyAlerts}
-              onValueChange={setAnomalyAlerts}
+              onValueChange={handleAnomalyAlertsChange}
               trackColor={{ false: colors.border, true: colors.secondary }}
               thumbColor="#fff"
             />
@@ -443,7 +599,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <Switch
               value={withdrawalReminders}
-              onValueChange={setWithdrawalReminders}
+              onValueChange={handleWithdrawalRemindersChange}
               trackColor={{ false: colors.border, true: colors.secondary }}
               thumbColor="#fff"
             />
@@ -469,7 +625,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <Switch
               value={purchaseConfirmations}
-              onValueChange={setPurchaseConfirmations}
+              onValueChange={handlePurchaseConfirmationsChange}
               trackColor={{ false: colors.border, true: colors.secondary }}
               thumbColor="#fff"
             />
@@ -492,14 +648,14 @@ export default function SettingsScreen({ navigation }) {
                 <Text style={styles.label}>App Withdrawal Mode</Text>
                 <Text style={styles.description}>
                   {appWithdrawal
-                    ? 'Withdrawals execute automatically through the app. You MUST enable "Enable Withdrawals" in your Binance API settings.'
-                    : 'You will withdraw manually in Binance. Do NOT enable "Enable Withdrawals" in your Binance API settings.'}
+                    ? 'Withdrawals execute automatically through the app. You MUST enable withdrawal permissions in your exchange API settings.'
+                    : 'You will withdraw manually on your exchange. Do NOT enable withdrawal permissions in your API settings.'}
                 </Text>
               </View>
             </View>
             <Switch
               value={appWithdrawal}
-              onValueChange={setAppWithdrawal}
+              onValueChange={handleAppWithdrawalChange}
               trackColor={{ false: colors.border, true: colors.secondary }}
               thumbColor="#fff"
             />
@@ -516,12 +672,7 @@ export default function SettingsScreen({ navigation }) {
             style={[styles.input, styles.addressInput]}
             value={walletAddress}
             onChangeText={setWalletAddress}
-            onBlur={() => {
-              // Auto-trim on blur
-              if (walletAddress) {
-                setWalletAddress(walletAddress.trim());
-              }
-            }}
+            onBlur={handleWalletAddressBlur}
             placeholder="bc1q..."
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
@@ -530,23 +681,49 @@ export default function SettingsScreen({ navigation }) {
           />
         </View>
 
-        {/* Save Button */}
-        <TouchableOpacity
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save Settings</Text>
-          )}
-        </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Security</Text>
 
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            ⓘ Your purchase schedule is in server time (UTC). You'll receive a notification to execute the trade at the scheduled time.
-          </Text>
+        {/* 2FA Toggle */}
+        <View style={styles.inputGroup}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingLeft}>
+              <Ionicons
+                name="shield-checkmark"
+                size={24}
+                color={twoFactorEnabled ? colors.success : colors.secondary}
+                style={styles.settingIcon}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Two-Factor Authentication</Text>
+                <Text style={styles.description}>
+                  {twoFactorEnabled
+                    ? 'Enabled - You will need to enter a code from your authenticator app when approving withdrawals.'
+                    : 'Add an extra layer of security to your withdrawals using an authenticator app.'}
+                </Text>
+              </View>
+            </View>
+            {twoFactorLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Switch
+                value={twoFactorEnabled}
+                onValueChange={handle2FAToggle}
+                trackColor={{ false: colors.border, true: colors.success }}
+                thumbColor="#fff"
+              />
+            )}
+          </View>
+          {twoFactorEnabled && (
+            <TouchableOpacity
+              style={styles.twoFactorHelpLink}
+              onPress={() => Linking.openURL('mailto:support@mybitcoindca.com?subject=2FA%20Recovery%20Request')}
+            >
+              <Ionicons name="help-circle-outline" size={16} color={colors.textTertiary} />
+              <Text style={styles.twoFactorHelpText}>
+                Lost access to your authenticator? Contact support@mybitcoindca.com
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Danger Zone</Text>
@@ -608,6 +785,116 @@ export default function SettingsScreen({ navigation }) {
           </View>
         </TouchableOpacity>
       </View>
+
+      {/* 2FA Setup/Disable Modal */}
+      <Modal
+        visible={show2FAModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleClose2FAModal}
+      >
+        <SafeAreaView style={styles.modalFullScreen}>
+          <ScrollView contentContainerStyle={styles.modalFullScreenContent}>
+            <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {isDisabling2FA ? 'Disable 2FA' : 'Enable 2FA'}
+            </Text>
+            <TouchableOpacity onPress={handleClose2FAModal} style={styles.modalCloseButton}>
+              <Ionicons name="close" size={28} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+            {!isDisabling2FA && twoFactorSetupData && (
+              <>
+                <Text style={styles.modalDescription}>
+                  Add this account to your authenticator app (Google Authenticator, Authy, 1Password, etc.)
+                </Text>
+
+                {/* Manual Entry Section - Primary for mobile users */}
+                <View style={styles.manualEntrySection}>
+                  <Text style={styles.manualEntryTitle}>Manual Entry (Recommended on Mobile)</Text>
+                  <Text style={styles.manualEntryInstructions}>
+                    In your authenticator app, tap "+" or "Add account", then select "Enter setup key" or "Manual entry"
+                  </Text>
+                  <View style={styles.secretContainer}>
+                    <Text style={styles.secretCodeDisplay}>{twoFactorSetupData.secret}</Text>
+                    <TouchableOpacity
+                      style={styles.copySecretButton}
+                      onPress={async () => {
+                        await Clipboard.setStringAsync(twoFactorSetupData.secret);
+                        Alert.alert('Copied', 'Secret code copied to clipboard');
+                      }}
+                    >
+                      <Ionicons name="copy-outline" size={20} color="#fff" />
+                      <Text style={styles.copySecretButtonText}>Copy</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.accountNameHint}>
+                    Account name: MyBitcoinDCA
+                  </Text>
+                </View>
+
+                {/* QR Code Section - For scanning from another device */}
+                <View style={styles.qrSection}>
+                  <Text style={styles.qrSectionTitle}>Or scan QR code (from another device)</Text>
+                  <View style={styles.qrContainer}>
+                    <QRCode
+                      value={twoFactorSetupData.otpauthUrl}
+                      size={160}
+                      backgroundColor="white"
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+
+            {isDisabling2FA && (
+              <Text style={styles.modalDescription}>
+                Enter the 6-digit code from your authenticator app to disable 2FA.
+              </Text>
+            )}
+
+            <Text style={styles.codeLabel}>
+              {isDisabling2FA ? 'Verification Code' : 'Enter code to verify'}
+            </Text>
+            <TextInput
+              style={styles.codeInput}
+              value={twoFactorCode}
+              onChangeText={(text) => setTwoFactorCode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              placeholder="000000"
+              placeholderTextColor={colors.textTertiary}
+              maxLength={6}
+              textAlign="center"
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={handleClose2FAModal}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalConfirmButton,
+                  twoFactorLoading && styles.modalButtonDisabled,
+                ]}
+                onPress={handleConfirm2FA}
+                disabled={twoFactorLoading}
+              >
+                {twoFactorLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalConfirmButtonText}>
+                    {isDisabling2FA ? 'Disable' : 'Enable'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -678,7 +965,6 @@ const createStyles = (colors) => StyleSheet.create({
   description: {
     fontSize: 14,
     color: colors.textTertiary,
-    marginBottom: 12,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -739,6 +1025,32 @@ const createStyles = (colors) => StyleSheet.create({
     fontWeight: 'bold',
     color: colors.textSecondary,
     marginLeft: 8,
+  },
+  frequencySelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  frequencyButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+  },
+  frequencyButtonSelected: {
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
+  },
+  frequencyButtonText: {
+    fontSize: 15,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  frequencyButtonTextSelected: {
+    color: '#fff',
   },
   daySelector: {
     maxHeight: 60,
@@ -844,5 +1156,175 @@ const createStyles = (colors) => StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // 2FA Modal styles
+  modalFullScreen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  modalFullScreenContent: {
+    padding: 20,
+    paddingTop: 60,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalCloseButton: {
+    padding: 8,
+  },
+  modalTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  // 2FA Help link styles
+  twoFactorHelpLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 6,
+  },
+  twoFactorHelpText: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    flex: 1,
+  },
+  // Manual Entry Section styles
+  manualEntrySection: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  manualEntryTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  manualEntryInstructions: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  secretContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  secretCodeDisplay: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    color: colors.text,
+    backgroundColor: colors.background,
+    padding: 14,
+    borderRadius: 10,
+    letterSpacing: 1,
+  },
+  copySecretButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    gap: 8,
+  },
+  copySecretButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  accountNameHint: {
+    fontSize: 13,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+  },
+  // QR Code Section styles
+  qrSection: {
+    marginBottom: 24,
+  },
+  qrSectionTitle: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  qrContainer: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    alignSelf: 'center',
+  },
+  codeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  codeInput: {
+    fontSize: 32,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    color: colors.text,
+    backgroundColor: colors.cardBackground,
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.border,
+    letterSpacing: 12,
+    marginBottom: 32,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 'auto',
+  },
+  modalCancelButton: {
+    flex: 1,
+    padding: 18,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  modalCancelButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalConfirmButton: {
+    flex: 1,
+    padding: 18,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+  },
+  modalConfirmButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  modalButtonDisabled: {
+    opacity: 0.6,
   },
 });

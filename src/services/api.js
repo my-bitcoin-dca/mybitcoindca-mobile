@@ -213,6 +213,32 @@ export const authAPI = {
     });
     return response.data;
   },
+
+  // 2FA API methods
+  get2FAStatus: async () => {
+    const response = await api.get('/auth/2fa/status');
+    return response.data;
+  },
+
+  setup2FA: async () => {
+    const response = await api.post('/auth/2fa/setup');
+    return response.data;
+  },
+
+  enable2FA: async (code) => {
+    const response = await api.post('/auth/2fa/enable', { code });
+    return response.data;
+  },
+
+  disable2FA: async (code) => {
+    const response = await api.post('/auth/2fa/disable', { code });
+    return response.data;
+  },
+
+  verify2FA: async (code) => {
+    const response = await api.post('/auth/2fa/verify', { code });
+    return response.data;
+  },
 };
 
 // DCA API calls

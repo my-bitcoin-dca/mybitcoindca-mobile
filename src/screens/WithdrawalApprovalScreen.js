@@ -9,9 +9,11 @@ import {
   ScrollView,
   Platform,
   Clipboard,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { executeWithdrawal, getWithdrawalFee } from '../services/binanceService';
+import { executeWithdrawal, getWithdrawalFee, getSelectedExchange, getExchangeInfo } from '../services/exchangeService';
 import { dcaAPI, authAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -23,9 +25,19 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
   const [loadingFee, setLoadingFee] = useState(true);
   const [manualMode, setManualMode] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [exchange, setExchange] = useState('binance');
+  const [exchangeName, setExchangeName] = useState('your exchange');
+
+  // 2FA state
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [verifying2FA, setVerifying2FA] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // 'approve' or 'manual'
 
   useEffect(() => {
-    fetchNetworkFee();
+    loadExchangeInfo();
+    fetch2FAStatus();
     // Use appWithdrawal from notification data if available
     if (withdrawalData.appWithdrawal !== undefined) {
       // appWithdrawal: true = app mode, false = manual mode
@@ -36,6 +48,31 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
       fetchSettings();
     }
   }, []);
+
+  const loadExchangeInfo = async () => {
+    try {
+      const selectedExchange = await getSelectedExchange();
+      setExchange(selectedExchange);
+      const info = getExchangeInfo(selectedExchange);
+      setExchangeName(info?.name || 'your exchange');
+      // Now fetch network fee with the correct exchange
+      await fetchNetworkFee(selectedExchange);
+    } catch (error) {
+      console.error('Error loading exchange info:', error);
+      await fetchNetworkFee('binance');
+    }
+  };
+
+  const fetch2FAStatus = async () => {
+    try {
+      const response = await authAPI.get2FAStatus();
+      if (response.success) {
+        setTwoFactorEnabled(response.data.enabled);
+      }
+    } catch (error) {
+      console.error('Error fetching 2FA status:', error);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -52,9 +89,9 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
     }
   };
 
-  const fetchNetworkFee = async () => {
+  const fetchNetworkFee = async (exchangeId = 'binance') => {
     try {
-      const fee = await getWithdrawalFee();
+      const fee = await getWithdrawalFee(exchangeId);
       setNetworkFee(fee);
     } catch (error) {
       console.error('Error fetching fee:', error);
@@ -65,6 +102,18 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
   };
 
   const handleApprove = async () => {
+    if (twoFactorEnabled) {
+      // Show 2FA verification modal before proceeding
+      setPendingAction('approve');
+      setTwoFactorCode('');
+      setShow2FAModal(true);
+    } else {
+      // No 2FA, proceed with confirmation
+      showApprovalConfirmation();
+    }
+  };
+
+  const showApprovalConfirmation = () => {
     Alert.alert(
       'Confirm Withdrawal',
       `Are you sure you want to withdraw ${withdrawalData.btcAmount} BTC to your hardware wallet?`,
@@ -79,10 +128,48 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
     );
   };
 
+  const handle2FAVerification = async () => {
+    if (twoFactorCode.length !== 6) {
+      Alert.alert('Invalid Code', 'Please enter a 6-digit verification code.');
+      return;
+    }
+
+    setVerifying2FA(true);
+    try {
+      const response = await authAPI.verify2FA(twoFactorCode);
+      if (response.success) {
+        setShow2FAModal(false);
+        setTwoFactorCode('');
+
+        // Proceed with the pending action
+        if (pendingAction === 'approve') {
+          showApprovalConfirmation();
+        } else if (pendingAction === 'manual') {
+          handleManualWithdrawalDoneAction();
+        }
+        setPendingAction(null);
+      } else {
+        Alert.alert('Error', response.message || 'Invalid verification code.');
+      }
+    } catch (error) {
+      console.error('Error verifying 2FA:', error);
+      Alert.alert('Error', 'Failed to verify code. Please try again.');
+    } finally {
+      setVerifying2FA(false);
+    }
+  };
+
+  const handleClose2FAModal = () => {
+    setShow2FAModal(false);
+    setTwoFactorCode('');
+    setPendingAction(null);
+  };
+
   const executeWithdrawalAction = async () => {
     setLoading(true);
     try {
       const result = await executeWithdrawal(
+        exchange,
         withdrawalData.address,
         withdrawalData.btcAmount,
         'BTC'
@@ -147,6 +234,18 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
   };
 
   const handleManualWithdrawalDone = async () => {
+    if (twoFactorEnabled) {
+      // Show 2FA verification modal before proceeding
+      setPendingAction('manual');
+      setTwoFactorCode('');
+      setShow2FAModal(true);
+    } else {
+      // No 2FA, proceed directly
+      handleManualWithdrawalDoneAction();
+    }
+  };
+
+  const handleManualWithdrawalDoneAction = async () => {
     setLoading(true);
     try {
       // Report the manual withdrawal to the server for tracking
@@ -161,7 +260,7 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
 
       Alert.alert(
         'Withdrawal Recorded',
-        'Please complete the withdrawal in Binance. The withdrawal has been recorded in your dashboard. Once confirmed on the blockchain, you can track it in your transaction history.',
+        `Please complete the withdrawal in ${exchangeName}. The withdrawal has been recorded in your dashboard. Once confirmed on the blockchain, you can track it in your transaction history.`,
         [
           {
             text: 'OK',
@@ -174,7 +273,7 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
       // Still allow user to proceed even if reporting fails
       Alert.alert(
         'Withdrawal Initiated',
-        'Please complete the withdrawal in Binance. Note: This withdrawal may not appear in your dashboard statistics.',
+        `Please complete the withdrawal in ${exchangeName}. Note: This withdrawal may not appear in your dashboard statistics.`,
         [
           {
             text: 'OK',
@@ -211,14 +310,14 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
         <View style={styles.manualModeCard}>
           <Text style={styles.manualModeTitle}>📋 Manual Withdrawal Instructions</Text>
           <Text style={styles.manualModeText}>
-            Copy the details below and complete the withdrawal in Binance manually.
+            Copy the details below and complete the withdrawal in {exchangeName} manually.
           </Text>
         </View>
       ) : (
         <View style={styles.userControlCard}>
           <Text style={styles.userControlTitle}>👤 You Control This Withdrawal</Text>
           <Text style={styles.userControlText}>
-            This withdrawal will be executed directly from YOUR Binance account to YOUR specified Bitcoin wallet address. We do NOT control or custody these funds.
+            This withdrawal will be executed directly from YOUR {exchangeName} account to YOUR specified Bitcoin wallet address. We do NOT control or custody these funds.
           </Text>
         </View>
       )}
@@ -311,10 +410,10 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
         <View style={styles.instructionsCard}>
           <Text style={styles.instructionsTitle}>📖 Steps to Complete</Text>
           <Text style={styles.instructionsText}>
-            1. Open the Binance app or website
+            1. Open the {exchangeName} app or website
           </Text>
           <Text style={styles.instructionsText}>
-            2. Go to Wallet → Fiat and Spot → Withdraw
+            2. Go to your Wallet → Withdraw
           </Text>
           <Text style={styles.instructionsText}>
             3. Select Bitcoin (BTC)
@@ -326,14 +425,14 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
             5. Select Network: Bitcoin (BTC)
           </Text>
           <Text style={styles.instructionsText}>
-            6. Review and confirm the withdrawal in Binance
+            6. Review and confirm the withdrawal in {exchangeName}
           </Text>
         </View>
       ) : (
         <View style={styles.warningCard}>
           <Text style={styles.warningTitle}>⚠️ Important - Verify Before Approving</Text>
           <Text style={styles.warningText}>
-            • This withdrawal executes on YOUR Binance account
+            • This withdrawal executes on YOUR {exchangeName} account
           </Text>
           <Text style={styles.warningText}>
             • Funds go directly to YOUR specified wallet address
@@ -399,6 +498,68 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
           </>
         )}
       </View>
+
+      {/* 2FA Verification Modal */}
+      <Modal
+        visible={show2FAModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleClose2FAModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>2FA Verification</Text>
+              <TouchableOpacity onPress={handleClose2FAModal}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalIconContainer}>
+              <Ionicons name="shield-checkmark" size={48} color={colors.primary} />
+            </View>
+
+            <Text style={styles.modalDescription}>
+              Enter the 6-digit code from your authenticator app to proceed with this withdrawal.
+            </Text>
+
+            <TextInput
+              style={styles.codeInput}
+              value={twoFactorCode}
+              onChangeText={(text) => setTwoFactorCode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              placeholder="000000"
+              placeholderTextColor={colors.textTertiary}
+              maxLength={6}
+              textAlign="center"
+              autoFocus={true}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={handleClose2FAModal}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalConfirmButton,
+                  verifying2FA && styles.modalButtonDisabled,
+                ]}
+                onPress={handle2FAVerification}
+                disabled={verifying2FA}
+              >
+                {verifying2FA ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalConfirmButtonText}>Verify</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -629,5 +790,86 @@ const createStyles = (colors) => StyleSheet.create({
     color: '#856404',
     marginBottom: 8,
     lineHeight: 20,
+  },
+  // 2FA Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  modalIconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 20,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  codeInput: {
+    fontSize: 28,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    color: colors.text,
+    backgroundColor: colors.background,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+    letterSpacing: 12,
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  modalCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalConfirmButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    backgroundColor: colors.success,
+    alignItems: 'center',
+  },
+  modalConfirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  modalButtonDisabled: {
+    opacity: 0.6,
   },
 });

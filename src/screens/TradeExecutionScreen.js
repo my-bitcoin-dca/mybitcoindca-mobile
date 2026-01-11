@@ -8,10 +8,10 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { executeMarketBuy } from '../services/binanceService';
+import { executeMarketBuy, getSelectedExchange, getExchangeInfo } from '../services/exchangeService';
 import { dcaAPI, authAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { getBinancePair, getCurrencySymbol } from '../utils/currency';
+import { getBinancePair, getKrakenPair, getCurrencySymbol } from '../utils/currency';
 
 export default function TradeExecutionScreen({ route, navigation }) {
   const { colors } = useTheme();
@@ -27,6 +27,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
   const [estimatedBtc, setEstimatedBtc] = useState(null);
   const [tradingFeePercent, setTradingFeePercent] = useState(0.1); // Default 0.1%
   const [currency, setCurrency] = useState(anomalyData?.currency || 'EUR');
+  const [exchange, setExchange] = useState('binance');
 
   useEffect(() => {
     // Load trading fee and estimate purchase
@@ -35,34 +36,56 @@ export default function TradeExecutionScreen({ route, navigation }) {
 
   const loadTradingFee = async () => {
     try {
-      const response = await authAPI.getSettings();
+      const [response, selectedExchange] = await Promise.all([
+        authAPI.getSettings(),
+        getSelectedExchange(),
+      ]);
+
+      const userExchange = response.success ? (response.data.settings.exchange || selectedExchange) : selectedExchange;
+      setExchange(userExchange);
+
+      // Set default fee based on exchange
+      const exchangeInfo = getExchangeInfo(userExchange);
+      const defaultFee = exchangeInfo?.tradingFee || 0.1;
+
       if (response.success) {
-        const fee = parseFloat(response.data.settings.exchangeTradingFee || 0.1);
+        const fee = parseFloat(response.data.settings.exchangeTradingFee || defaultFee);
         const userCurrency = response.data.settings.currency || 'EUR';
         setTradingFeePercent(fee);
         setCurrency(userCurrency);
         // Estimate purchase with the loaded fee and currency
-        await estimatePurchase(fee, userCurrency);
+        await estimatePurchase(fee, userCurrency, userExchange);
       } else {
         // Use defaults
-        await estimatePurchase(0.1, 'EUR');
+        await estimatePurchase(defaultFee, 'EUR', userExchange);
       }
     } catch (error) {
       console.error('Error loading trading fee:', error);
       // Use defaults
-      await estimatePurchase(0.1, 'EUR');
+      await estimatePurchase(0.1, 'EUR', 'binance');
     }
   };
 
-  const estimatePurchase = async (feePercent, userCurrency = 'EUR') => {
+  const estimatePurchase = async (feePercent, userCurrency = 'EUR', userExchange = 'binance') => {
     try {
-      // Get the correct trading pair for the user's currency
-      const symbol = getBinancePair(userCurrency);
+      let currentPrice;
 
-      // Fetch current BTC price in user's currency from Binance
-      const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
-      const data = await response.json();
-      const currentPrice = parseFloat(data.price);
+      if (userExchange === 'kraken') {
+        // Fetch from Kraken
+        const pair = getKrakenPair(userCurrency);
+        const response = await fetch(`https://api.kraken.com/0/public/Ticker?pair=${pair}`);
+        const data = await response.json();
+        if (data.result) {
+          const tickerData = Object.values(data.result)[0];
+          currentPrice = parseFloat(tickerData.a[0]); // Ask price
+        }
+      } else {
+        // Fetch from Binance (default)
+        const symbol = getBinancePair(userCurrency);
+        const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+        const data = await response.json();
+        currentPrice = parseFloat(data.price);
+      }
 
       setBtcPrice(currentPrice);
 
@@ -70,7 +93,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
       const fiatAmount = effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount;
 
       // Estimate BTC amount
-      // Note: Trading fee is automatically deducted by Binance, this is just an estimate
+      // Note: Trading fee is automatically deducted by the exchange, this is just an estimate
       const estimatedAmount = fiatAmount / currentPrice;
       setEstimatedBtc(estimatedAmount);
     } catch (error) {
@@ -102,7 +125,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
     setLoading(true);
     try {
       const fiatAmount = effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount;
-      const result = await executeMarketBuy(fiatAmount, tradingFeePercent, currency);
+      const result = await executeMarketBuy(exchange, fiatAmount, tradingFeePercent, currency);
 
       if (result.success) {
         const currencySymbol = getCurrencySymbol(currency);
