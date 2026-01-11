@@ -140,6 +140,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
             avgPrice: result.data.avgPrice,
             tradingFee: result.data.tradingFee,
             timestamp: result.data.timestamp,
+            exchange: exchange,
           });
         } catch (reportError) {
           console.error('Failed to report trade to server:', reportError);

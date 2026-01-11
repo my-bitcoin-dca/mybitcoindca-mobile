@@ -172,13 +172,13 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
     // Calculate actual execution details from fills
     let totalBtc = 0;
     let totalFiat = 0;
-    let totalFees = 0;
+    let totalFeesBtc = 0;
 
     if (order.fills && order.fills.length > 0) {
       order.fills.forEach(fill => {
         totalBtc += parseFloat(fill.qty);
         totalFiat += parseFloat(fill.price) * parseFloat(fill.qty);
-        totalFees += parseFloat(fill.commission); // Commission in BTC
+        totalFeesBtc += parseFloat(fill.commission); // Commission in BTC
       });
     } else {
       // Fallback to order-level data if fills not available
@@ -189,6 +189,9 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
     // Calculate average execution price
     const avgPrice = totalFiat / totalBtc;
 
+    // Convert trading fee from BTC to fiat
+    const tradingFeeInFiat = totalFeesBtc * avgPrice;
+
     return {
       success: true,
       data: {
@@ -197,7 +200,7 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
         fiatSpent: totalFiat,
         currency: currency,
         avgPrice: avgPrice,
-        tradingFee: totalFees,
+        tradingFee: tradingFeeInFiat,
         timestamp: new Date(order.transactTime).toISOString(),
         fills: order.fills,
         // Keep eurSpent for backward compatibility with older mobile app versions
