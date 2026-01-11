@@ -18,6 +18,8 @@ export async function getBinanceClient() {
   return Binance({
     apiKey,
     apiSecret,
+    useServerTime: true, // Sync with Binance server time to avoid timestamp errors
+    recvWindow: 60000, // Allow 60 second window for clock drift
   });
 }
 

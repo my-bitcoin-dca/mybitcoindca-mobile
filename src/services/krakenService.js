@@ -29,7 +29,7 @@ async function krakenRequest(endpoint, params = {}) {
     throw new Error('Kraken API keys not found. Please configure them first.');
   }
 
-  const nonce = Date.now() * 1000;
+  const nonce = Date.now();
   const postData = new URLSearchParams({ ...params, nonce }).toString();
   const path = `/0/private/${endpoint}`;
   const signature = getKrakenSignature(path, postData, apiSecret, nonce);
