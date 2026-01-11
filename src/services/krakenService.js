@@ -6,13 +6,19 @@ const KRAKEN_API_URL = 'https://api.kraken.com';
 
 /**
  * Generate Kraken API signature
- * Kraken uses HMAC-SHA512 with a specific signing method
+ * Kraken uses HMAC-SHA512 with a specific signing method:
+ * HMAC-SHA512 of (URI path + SHA256(nonce + POST data)) using base64-decoded API secret
  */
 function getKrakenSignature(path, postData, secret, nonce) {
-  const message = nonce + postData;
+  const message = String(nonce) + postData;
   const hash = CryptoJS.SHA256(message);
+
+  // Properly concatenate path and hash as WordArrays to preserve binary data
+  const pathWordArray = CryptoJS.enc.Latin1.parse(path);
+  const hmacMessage = pathWordArray.concat(hash);
+
   const hmac = CryptoJS.HmacSHA512(
-    path + CryptoJS.enc.Latin1.stringify(hash),
+    hmacMessage,
     CryptoJS.enc.Base64.parse(secret)
   );
   return CryptoJS.enc.Base64.stringify(hmac);
