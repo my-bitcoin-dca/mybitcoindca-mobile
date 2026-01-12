@@ -44,21 +44,15 @@ export default function TradeExecutionScreen({ route, navigation }) {
       const userExchange = response.success ? (response.data.settings.exchange || selectedExchange) : selectedExchange;
       setExchange(userExchange);
 
-      // Set default fee based on exchange
+      // Use exchange default fee (actual fee is calculated from API response during trade execution)
       const exchangeInfo = getExchangeInfo(userExchange);
       const defaultFee = exchangeInfo?.tradingFee || 0.1;
+      setTradingFeePercent(defaultFee);
 
-      if (response.success) {
-        const fee = parseFloat(response.data.settings.exchangeTradingFee || defaultFee);
-        const userCurrency = response.data.settings.currency || 'EUR';
-        setTradingFeePercent(fee);
-        setCurrency(userCurrency);
-        // Estimate purchase with the loaded fee and currency
-        await estimatePurchase(fee, userCurrency, userExchange);
-      } else {
-        // Use defaults
-        await estimatePurchase(defaultFee, 'EUR', userExchange);
-      }
+      const userCurrency = response.success ? (response.data.settings.currency || 'EUR') : 'EUR';
+      setCurrency(userCurrency);
+
+      await estimatePurchase(defaultFee, userCurrency, userExchange);
     } catch (error) {
       console.error('Error loading trading fee:', error);
       // Use defaults - but still try to get selected exchange from local storage
@@ -144,6 +138,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
             currency: result.data.currency,
             avgPrice: result.data.avgPrice,
             tradingFee: result.data.tradingFee,
+            tradingFeeBtc: result.data.tradingFeeBtc, // Fee in BTC (actual deducted amount)
             timestamp: result.data.timestamp,
             exchange: exchange,
           });

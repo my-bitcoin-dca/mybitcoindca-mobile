@@ -210,18 +210,22 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
     // Calculate average execution price
     const avgPrice = totalFiat / totalBtc;
 
-    // Convert trading fee from BTC to fiat
+    // Net BTC after fee deduction (Binance deducts fee from BTC balance)
+    const netBtc = totalBtc - totalFeesBtc;
+
+    // Convert trading fee from BTC to fiat (for display purposes)
     const tradingFeeInFiat = totalFeesBtc * avgPrice;
 
     return {
       success: true,
       data: {
         orderId: order.orderId,
-        btcAmount: totalBtc,
+        btcAmount: netBtc, // Net BTC after fee
         fiatSpent: totalFiat,
         currency: currency,
         avgPrice: avgPrice,
-        tradingFee: tradingFeeInFiat,
+        tradingFee: tradingFeeInFiat, // Fee in fiat (for backward compatibility)
+        tradingFeeBtc: totalFeesBtc, // Fee in BTC (actual amount deducted)
         timestamp: new Date(order.transactTime).toISOString(),
         fills: order.fills,
         // Keep eurSpent for backward compatibility with older mobile app versions
