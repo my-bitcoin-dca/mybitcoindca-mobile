@@ -204,14 +204,34 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.26, cur
     const tickerData = Object.values(ticker)[0];
     const currentPrice = parseFloat(tickerData.a[0]); // Ask price
 
-    // Get pair info for precision
+    // Get pair info for precision and minimum order
     const assetPairs = await krakenPublicRequest('AssetPairs', { pair });
     const pairInfo = Object.values(assetPairs)[0];
     const lotDecimals = pairInfo.lot_decimals || 8;
+    const orderMin = parseFloat(pairInfo.ordermin) || 0.0001; // Minimum BTC order size
+
+    // Calculate minimum fiat value based on minimum BTC order
+    const minFiatValue = orderMin * currentPrice;
+
+    // Check if order meets minimum value
+    if (fiatAmount < minFiatValue) {
+      return {
+        success: false,
+        error: `Order value ${fiatAmount} ${currency} is below Kraken minimum of ~${minFiatValue.toFixed(2)} ${currency} (${orderMin} BTC). Please increase your DCA amount.`,
+      };
+    }
 
     // Calculate BTC quantity to buy
     const rawQuantity = fiatAmount / currentPrice;
     const quantity = rawQuantity.toFixed(lotDecimals);
+
+    // Verify quantity meets minimum after rounding
+    if (parseFloat(quantity) < orderMin) {
+      return {
+        success: false,
+        error: `Order quantity ${quantity} BTC is below Kraken minimum of ${orderMin} BTC. Please increase your DCA amount slightly.`,
+      };
+    }
 
     // Execute market buy order
     const order = await krakenRequest('AddOrder', {

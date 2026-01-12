@@ -151,6 +151,18 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
     const lotSizeFilter = symbolInfo.filters.find(f => f.filterType === 'LOT_SIZE');
     const stepSize = parseFloat(lotSizeFilter.stepSize);
 
+    // Find NOTIONAL filter to get minimum order value
+    const notionalFilter = symbolInfo.filters.find(f => f.filterType === 'NOTIONAL');
+    const minNotional = notionalFilter ? parseFloat(notionalFilter.minNotional) : 5;
+
+    // Check if order meets minimum notional value
+    if (fiatAmount < minNotional) {
+      return {
+        success: false,
+        error: `Order value ${fiatAmount} ${currency} is below Binance minimum of ${minNotional} ${currency}. Please increase your DCA amount.`,
+      };
+    }
+
     // Calculate precision from step size (e.g., 0.00001 = 5 decimals)
     const precision = Math.abs(Math.log10(stepSize));
 
@@ -160,6 +172,15 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
 
     // Round down to the correct precision
     const quantity = Math.floor(rawQuantity * Math.pow(10, precision)) / Math.pow(10, precision);
+
+    // Double-check the notional value after rounding
+    const orderValue = quantity * currentPrice;
+    if (orderValue < minNotional) {
+      return {
+        success: false,
+        error: `Order value ${orderValue.toFixed(2)} ${currency} is below Binance minimum of ${minNotional} ${currency} after rounding. Please increase your DCA amount slightly.`,
+      };
+    }
 
     // Execute market buy order with calculated quantity
     const order = await client.order({
