@@ -6,6 +6,10 @@
 
 A React Native mobile app for secure Bitcoin withdrawal management with privacy-first, client-side security architecture.
 
+## Download
+
+[![Get it on Google Play](https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg)](https://play.google.com/store/apps/details?id=com.mybitcoindca.mobile)
+
 **🔒 Security Verified:** Automated AI-powered scans verify that API keys never leave your device. [View latest scan →](https://github.com/my-bitcoin-dca/mybitcoindca-mobile/actions/workflows/semgrep.yml)
 
 ## Overview
