@@ -61,8 +61,12 @@ export default function TradeExecutionScreen({ route, navigation }) {
       }
     } catch (error) {
       console.error('Error loading trading fee:', error);
-      // Use defaults
-      await estimatePurchase(0.1, 'EUR', 'binance');
+      // Use defaults - but still try to get selected exchange from local storage
+      const fallbackExchange = await getSelectedExchange();
+      setExchange(fallbackExchange);
+      const exchangeInfo = getExchangeInfo(fallbackExchange);
+      const defaultFee = exchangeInfo?.tradingFee || 0.1;
+      await estimatePurchase(defaultFee, 'EUR', fallbackExchange);
     }
   };
 
@@ -106,10 +110,11 @@ export default function TradeExecutionScreen({ route, navigation }) {
   const handleExecute = async () => {
     const fiatAmount = effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount;
     const currencySymbol = getCurrencySymbol(currency);
+    const exchangeName = getExchangeInfo(exchange).name;
 
     Alert.alert(
       'Confirm DCA Purchase',
-      `Execute market buy order for ${currencySymbol}${fiatAmount} ${currency}?\n\nEstimated: ${estimatedBtc?.toFixed(8) || '~'} BTC`,
+      `Execute market buy order on ${exchangeName} for ${currencySymbol}${fiatAmount} ${currency}?\n\nEstimated: ${estimatedBtc?.toFixed(8) || '~'} BTC`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -230,6 +235,11 @@ export default function TradeExecutionScreen({ route, navigation }) {
         )}
 
         <View style={styles.infoCard}>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Exchange:</Text>
+            <Text style={styles.infoValue}>{getExchangeInfo(exchange).name}</Text>
+          </View>
+
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{currency} Amount:</Text>
             <Text style={styles.infoValue}>
