@@ -49,16 +49,20 @@ export default function APIKeysScreen({ navigation }) {
     try {
       // Load from server settings
       const response = await authAPI.getSettings();
+      console.log('[APIKeys] Server settings response:', JSON.stringify(response.data?.settings, null, 2));
       if (response.success && response.data?.settings?.exchange) {
+        console.log('[APIKeys] Using server exchange:', response.data.settings.exchange);
         setSelectedExchangeId(response.data.settings.exchange);
       } else {
         // Fall back to local storage
         const stored = await getSelectedExchange();
+        console.log('[APIKeys] Falling back to local storage:', stored);
         setSelectedExchangeId(stored);
       }
     } catch (error) {
       console.error('Error loading exchange settings:', error);
       const stored = await getSelectedExchange();
+      console.log('[APIKeys] Error fallback to local storage:', stored);
       setSelectedExchangeId(stored);
     } finally {
       setInitialLoading(false);
@@ -71,14 +75,17 @@ export default function APIKeysScreen({ navigation }) {
   };
 
   const handleExchangeChange = async (exchangeId) => {
+    console.log('[APIKeys] Changing exchange to:', exchangeId);
     setSelectedExchangeId(exchangeId);
     await setSelectedExchange(exchangeId);
+    console.log('[APIKeys] Saved to local storage');
 
     // Save to server
     try {
       await authAPI.updateSettings({ exchange: exchangeId });
+      console.log('[APIKeys] Saved to server');
     } catch (error) {
-      console.error('Error saving exchange setting:', error);
+      console.error('[APIKeys] Error saving exchange setting:', error);
     }
 
     // Clear input fields when switching exchanges
