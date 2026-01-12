@@ -152,12 +152,18 @@ export default function TradeExecutionScreen({ route, navigation }) {
           // Continue even if reporting fails - trade was successful
         }
 
-        Alert.alert(
-          'Success',
-          `Trade executed successfully!\n\n` +
+        let message = `Trade executed successfully!\n\n` +
           `BTC Purchased: ${result.data.btcAmount.toFixed(8)}\n` +
           `${currency} Spent: ${currencySymbol}${result.data.fiatSpent.toFixed(2)}\n` +
-          `Avg Price: ${currencySymbol}${result.data.avgPrice.toFixed(2)}`,
+          `Avg Price: ${currencySymbol}${result.data.avgPrice.toFixed(2)}`;
+
+        if (result.warning) {
+          message += `\n\n⚠️ ${result.warning}`;
+        }
+
+        Alert.alert(
+          'Success',
+          message,
           [
             {
               text: 'OK',

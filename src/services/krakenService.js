@@ -224,32 +224,46 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.26, cur
     // Get order details
     const txid = order.txid[0];
 
-    // Query the order for execution details
-    // Note: Market orders execute immediately, but we may need to wait a moment
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const closedOrders = await krakenRequest('ClosedOrders');
-    const orderDetails = closedOrders.closed[txid];
-
     let totalBtc = 0;
     let totalFiat = 0;
     let totalFees = 0;
+    let warning = null;
 
-    if (orderDetails) {
-      totalBtc = parseFloat(orderDetails.vol_exec);
-      totalFiat = parseFloat(orderDetails.cost);
-      totalFees = parseFloat(orderDetails.fee);
-    } else {
-      // Fallback calculation
+    // Try to query the order for execution details
+    // This requires "Query open orders & trades" and "Query closed orders & trades" permissions
+    // If these permissions are not enabled, we fall back to calculated values
+    try {
+      // Market orders execute immediately, but we may need to wait a moment
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const closedOrders = await krakenRequest('ClosedOrders');
+      const orderDetails = closedOrders.closed[txid];
+
+      if (orderDetails) {
+        totalBtc = parseFloat(orderDetails.vol_exec);
+        totalFiat = parseFloat(orderDetails.cost);
+        totalFees = parseFloat(orderDetails.fee);
+      } else {
+        // Order not found in closed orders yet, use fallback
+        totalBtc = parseFloat(quantity);
+        totalFiat = fiatAmount;
+        totalFees = fiatAmount * (tradingFeePercent / 100);
+      }
+    } catch (queryError) {
+      // ClosedOrders query failed (likely missing permissions)
+      // The order was still placed successfully, so use fallback calculation
+      console.warn('Could not query order details:', queryError.message);
       totalBtc = parseFloat(quantity);
       totalFiat = fiatAmount;
       totalFees = fiatAmount * (tradingFeePercent / 100);
+      warning = 'Values are estimated. Enable "Query closed orders & trades" in your Kraken API key for exact amounts.';
     }
 
     const avgPrice = totalFiat / totalBtc;
 
     return {
       success: true,
+      warning: warning,
       data: {
         orderId: txid,
         btcAmount: totalBtc,
