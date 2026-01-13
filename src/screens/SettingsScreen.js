@@ -53,7 +53,6 @@ export default function SettingsScreen({ navigation }) {
   // Settings state
   const [currency, setCurrency] = useState('EUR');
   const [weeklyDcaAmount, setWeeklyDcaAmount] = useState('35');
-  const [exchangeTradingFee, setExchangeTradingFee] = useState('0.1');
   const [walletAddress, setWalletAddress] = useState('');
   const [appWithdrawal, setAppWithdrawal] = useState(true);
   const [selectedFrequency, setSelectedFrequency] = useState('weekly');
@@ -89,7 +88,6 @@ export default function SettingsScreen({ navigation }) {
         const { settings } = settingsResponse.data;
         setCurrency(settings.currency || 'EUR');
         setWeeklyDcaAmount(settings.weeklyDcaAmount?.toString() || '35');
-        setExchangeTradingFee(settings.exchangeTradingFee?.toString() || '0.1');
         setWalletAddress(settings.hardwareWalletAddress || '');
         setAppWithdrawal(settings.appWithdrawal ?? true);
         setSelectedFrequency(settings.purchaseSchedule?.frequency || 'weekly');
@@ -175,15 +173,6 @@ export default function SettingsScreen({ navigation }) {
       return;
     }
     await saveSettings({ weeklyDcaAmount: amount });
-  };
-
-  const handleTradingFeeBlur = async () => {
-    const fee = parseFloat(exchangeTradingFee);
-    if (isNaN(fee) || fee < 0 || fee > 100) {
-      Alert.alert('Invalid Input', 'Trading fee must be between 0 and 100%');
-      return;
-    }
-    await saveSettings({ exchangeTradingFee: fee });
   };
 
   const handleWalletAddressBlur = async () => {
@@ -452,26 +441,6 @@ export default function SettingsScreen({ navigation }) {
               placeholder="35"
               placeholderTextColor={colors.textTertiary}
             />
-          </View>
-        </View>
-
-        {/* Exchange Trading Fee */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Exchange Trading Fee (%)</Text>
-          <Text style={styles.description}>
-            Trading fee percentage charged by your exchange (default: 0.1%)
-          </Text>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              value={exchangeTradingFee}
-              onChangeText={setExchangeTradingFee}
-              onBlur={handleTradingFeeBlur}
-              keyboardType="decimal-pad"
-              placeholder="0.1"
-              placeholderTextColor={colors.textTertiary}
-            />
-            <Text style={styles.percentSymbol}>%</Text>
           </View>
         </View>
 
