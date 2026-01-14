@@ -2,42 +2,6 @@ import Binance from 'binance-api-react-native';
 import storage from '../utils/storage';
 import { getBinancePair } from '../utils/currency';
 
-// Cache for server time offset to avoid fetching on every request
-let serverTimeOffset = null;
-let lastTimeSyncAt = null;
-const TIME_SYNC_INTERVAL = 5 * 60 * 1000; // Re-sync every 5 minutes
-
-/**
- * Fetch Binance server time and calculate offset from device time
- * This is needed because mobile device clocks can drift significantly
- */
-async function syncServerTime() {
-  try {
-    const response = await fetch('https://api.binance.com/api/v3/time');
-    const data = await response.json();
-    const serverTime = data.serverTime;
-    const localTime = Date.now();
-    serverTimeOffset = serverTime - localTime;
-    lastTimeSyncAt = localTime;
-    console.log(`[Binance] Time synced. Offset: ${serverTimeOffset}ms`);
-    return serverTimeOffset;
-  } catch (error) {
-    console.error('[Binance] Failed to sync server time:', error);
-    return 0;
-  }
-}
-
-/**
- * Get current server time offset, re-syncing if needed
- */
-async function getServerTimeOffset() {
-  const now = Date.now();
-  if (serverTimeOffset === null || !lastTimeSyncAt || (now - lastTimeSyncAt) > TIME_SYNC_INTERVAL) {
-    await syncServerTime();
-  }
-  return serverTimeOffset || 0;
-}
-
 /**
  * Get Binance client using keys stored on device
  * These are FULL-ACCESS keys (including withdrawal permissions)
@@ -51,15 +15,10 @@ export async function getBinanceClient() {
     throw new Error('Binance API keys not found. Please configure them first.');
   }
 
-  // Sync with Binance server time before creating client
-  const timeOffset = await getServerTimeOffset();
-
   return Binance({
     apiKey,
     apiSecret,
-    useServerTime: false, // Disable - we handle time sync manually
-    recvWindow: 60000, // Allow 60 second window for clock drift
-    getTime: () => Date.now() + timeOffset, // Custom time function with offset
+    recvWindow: 60000,
   });
 }
 
@@ -109,6 +68,7 @@ export async function executeWithdrawal(address, amount, network = 'BTC') {
       network: network,
       address: address,
       amount: amount,
+      useServerTime: true,
     });
 
     return {
@@ -132,7 +92,9 @@ export async function getAccountBalances() {
   const client = await getBinanceClient();
 
   try {
-    const accountInfo = await client.accountInfo();
+    // Pass useServerTime: true to sync with Binance server time
+    // This prevents "timestamp ahead of server" errors
+    const accountInfo = await client.accountInfo({ useServerTime: true });
     return {
       success: true,
       data: accountInfo.balances.filter(b => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0),
@@ -154,7 +116,7 @@ export async function getWithdrawalFee() {
   const client = await getBinanceClient();
 
   try {
-    const fees = await client.withdrawalFee({ coin: 'BTC' });
+    const fees = await client.withdrawalFee({ coin: 'BTC', useServerTime: true });
     return parseFloat(fees);
   } catch (error) {
     console.error('Error fetching withdrawal fee:', error);
@@ -228,6 +190,7 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
       side: 'BUY',
       type: 'MARKET',
       quantity: quantity.toFixed(precision),
+      useServerTime: true,
     });
 
     // Calculate actual execution details from fills
