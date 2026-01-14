@@ -35,18 +35,30 @@ export function getExchangeInfo(exchangeId) {
 }
 
 /**
- * Get the current selected exchange from storage
+ * Get storage key with optional user namespace
+ * @param {string} baseKey - The base key name
+ * @param {string} userId - Optional user ID for namespacing
  */
-export async function getSelectedExchange() {
-  const exchange = await storage.getItem('selected_exchange');
+function getStorageKey(baseKey, userId) {
+  return userId ? `${baseKey}_${userId}` : baseKey;
+}
+
+/**
+ * Get the current selected exchange from storage
+ * @param {string} userId - User ID for namespaced storage
+ */
+export async function getSelectedExchange(userId) {
+  const exchange = await storage.getItem(getStorageKey('selected_exchange', userId));
   return exchange || 'binance';
 }
 
 /**
  * Set the selected exchange
+ * @param {string} exchangeId - Exchange identifier
+ * @param {string} userId - User ID for namespaced storage
  */
-export async function setSelectedExchange(exchangeId) {
-  await storage.setItem('selected_exchange', exchangeId);
+export async function setSelectedExchange(exchangeId, userId) {
+  await storage.setItem(getStorageKey('selected_exchange', userId), exchangeId);
 }
 
 /**
@@ -64,75 +76,97 @@ function getService(exchangeId) {
 
 /**
  * Store API keys for the specified exchange
+ * @param {string} exchangeId - Exchange identifier
+ * @param {string} apiKey - API key
+ * @param {string} apiSecret - API secret
+ * @param {string} userId - User ID for namespaced storage
  */
-export async function storeExchangeKeys(exchangeId, apiKey, apiSecret) {
+export async function storeExchangeKeys(exchangeId, apiKey, apiSecret, userId) {
   const service = getService(exchangeId);
   if (exchangeId === 'kraken') {
-    await service.storeKrakenKeys(apiKey, apiSecret);
+    await service.storeKrakenKeys(apiKey, apiSecret, userId);
   } else {
-    await service.storeBinanceKeys(apiKey, apiSecret);
+    await service.storeBinanceKeys(apiKey, apiSecret, userId);
   }
 }
 
 /**
  * Check if API keys exist for the specified exchange
+ * @param {string} exchangeId - Exchange identifier
+ * @param {string} userId - User ID for namespaced storage
  */
-export async function hasExchangeKeys(exchangeId) {
+export async function hasExchangeKeys(exchangeId, userId) {
   const service = getService(exchangeId);
   if (exchangeId === 'kraken') {
-    return await service.hasKrakenKeys();
+    return await service.hasKrakenKeys(userId);
   } else {
-    return await service.hasBinanceKeys();
+    return await service.hasBinanceKeys(userId);
   }
 }
 
 /**
  * Delete API keys for the specified exchange
+ * @param {string} exchangeId - Exchange identifier
+ * @param {string} userId - User ID for namespaced storage
  */
-export async function deleteExchangeKeys(exchangeId) {
+export async function deleteExchangeKeys(exchangeId, userId) {
   const service = getService(exchangeId);
   if (exchangeId === 'kraken') {
-    await service.deleteKrakenKeys();
+    await service.deleteKrakenKeys(userId);
   } else {
-    await service.deleteBinanceKeys();
+    await service.deleteBinanceKeys(userId);
   }
 }
 
 /**
  * Get account balances from the specified exchange
+ * @param {string} exchangeId - Exchange identifier
+ * @param {string} userId - User ID for namespaced storage
  */
-export async function getAccountBalances(exchangeId) {
+export async function getAccountBalances(exchangeId, userId) {
   const service = getService(exchangeId);
-  return await service.getAccountBalances();
+  return await service.getAccountBalances(userId);
 }
 
 /**
  * Get withdrawal fee for BTC from the specified exchange
+ * @param {string} exchangeId - Exchange identifier
+ * @param {string} userId - User ID for namespaced storage
  */
-export async function getWithdrawalFee(exchangeId) {
+export async function getWithdrawalFee(exchangeId, userId) {
   const service = getService(exchangeId);
-  return await service.getWithdrawalFee();
+  return await service.getWithdrawalFee(userId);
 }
 
 /**
  * Execute withdrawal on the specified exchange
+ * @param {string} exchangeId - Exchange identifier
+ * @param {string} address - Withdrawal address
+ * @param {number} amount - Amount to withdraw
+ * @param {string} network - Network (default: BTC)
+ * @param {string} userId - User ID for namespaced storage
  */
-export async function executeWithdrawal(exchangeId, address, amount, network = 'BTC') {
+export async function executeWithdrawal(exchangeId, address, amount, network = 'BTC', userId) {
   const service = getService(exchangeId);
   if (exchangeId === 'kraken') {
     // Kraken doesn't use network parameter the same way
-    return await service.executeWithdrawal(address, amount);
+    return await service.executeWithdrawal(address, amount, userId);
   } else {
-    return await service.executeWithdrawal(address, amount, network);
+    return await service.executeWithdrawal(address, amount, network, userId);
   }
 }
 
 /**
  * Execute market buy order on the specified exchange
+ * @param {string} exchangeId - Exchange identifier
+ * @param {number} fiatAmount - Amount in fiat to spend
+ * @param {number} tradingFeePercent - Trading fee percentage
+ * @param {string} currency - Currency code
+ * @param {string} userId - User ID for namespaced storage
  */
-export async function executeMarketBuy(exchangeId, fiatAmount, tradingFeePercent, currency) {
+export async function executeMarketBuy(exchangeId, fiatAmount, tradingFeePercent, currency, userId) {
   const service = getService(exchangeId);
-  return await service.executeMarketBuy(fiatAmount, tradingFeePercent, currency);
+  return await service.executeMarketBuy(fiatAmount, tradingFeePercent, currency, userId);
 }
 
 /**

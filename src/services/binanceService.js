@@ -3,13 +3,23 @@ import storage from '../utils/storage';
 import { getBinancePair } from '../utils/currency';
 
 /**
+ * Get storage key with optional user namespace
+ * @param {string} baseKey - The base key name
+ * @param {string} userId - Optional user ID for namespacing
+ */
+function getStorageKey(baseKey, userId) {
+  return userId ? `${baseKey}_${userId}` : baseKey;
+}
+
+/**
  * Get Binance client using keys stored on device
  * These are FULL-ACCESS keys (including withdrawal permissions)
  * They NEVER leave the device
+ * @param {string} userId - User ID for namespaced key storage
  */
-export async function getBinanceClient() {
-  const apiKey = await storage.getItem('binance_api_key');
-  const apiSecret = await storage.getItem('binance_api_secret');
+export async function getBinanceClient(userId) {
+  const apiKey = await storage.getItem(getStorageKey('binance_api_key', userId));
+  const apiSecret = await storage.getItem(getStorageKey('binance_api_secret', userId));
 
   if (!apiKey || !apiSecret) {
     throw new Error('Binance API keys not found. Please configure them first.');
@@ -26,27 +36,30 @@ export async function getBinanceClient() {
  * Store Binance API keys securely on device
  * @param {string} apiKey - Binance API key
  * @param {string} apiSecret - Binance API secret
+ * @param {string} userId - User ID for namespaced key storage
  */
-export async function storeBinanceKeys(apiKey, apiSecret) {
-  await storage.setItem('binance_api_key', apiKey);
-  await storage.setItem('binance_api_secret', apiSecret);
+export async function storeBinanceKeys(apiKey, apiSecret, userId) {
+  await storage.setItem(getStorageKey('binance_api_key', userId), apiKey);
+  await storage.setItem(getStorageKey('binance_api_secret', userId), apiSecret);
 }
 
 /**
  * Check if Binance API keys are stored
+ * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<boolean>}
  */
-export async function hasBinanceKeys() {
-  const apiKey = await storage.getItem('binance_api_key');
+export async function hasBinanceKeys(userId) {
+  const apiKey = await storage.getItem(getStorageKey('binance_api_key', userId));
   return !!apiKey;
 }
 
 /**
  * Delete Binance API keys from device
+ * @param {string} userId - User ID for namespaced key storage
  */
-export async function deleteBinanceKeys() {
-  await storage.deleteItem('binance_api_key');
-  await storage.deleteItem('binance_api_secret');
+export async function deleteBinanceKeys(userId) {
+  await storage.deleteItem(getStorageKey('binance_api_key', userId));
+  await storage.deleteItem(getStorageKey('binance_api_secret', userId));
 }
 
 /**
@@ -57,10 +70,11 @@ export async function deleteBinanceKeys() {
  * @param {string} address - Bitcoin withdrawal address
  * @param {number} amount - Amount in BTC to withdraw
  * @param {string} network - Network (default: BTC)
+ * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<Object>} Withdrawal result
  */
-export async function executeWithdrawal(address, amount, network = 'BTC') {
-  const client = await getBinanceClient();
+export async function executeWithdrawal(address, amount, network = 'BTC', userId) {
+  const client = await getBinanceClient(userId);
 
   try {
     const result = await client.withdraw({
@@ -86,10 +100,11 @@ export async function executeWithdrawal(address, amount, network = 'BTC') {
 
 /**
  * Get account balances
+ * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<Object>} Account info with balances
  */
-export async function getAccountBalances() {
-  const client = await getBinanceClient();
+export async function getAccountBalances(userId) {
+  const client = await getBinanceClient(userId);
 
   try {
     // Pass useServerTime: true to sync with Binance server time
@@ -110,10 +125,11 @@ export async function getAccountBalances() {
 
 /**
  * Get withdrawal fee for BTC
+ * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<number>} Network fee
  */
-export async function getWithdrawalFee() {
-  const client = await getBinanceClient();
+export async function getWithdrawalFee(userId) {
+  const client = await getBinanceClient(userId);
 
   try {
     const fees = await client.withdrawalFee({ coin: 'BTC', useServerTime: true });
@@ -132,10 +148,11 @@ export async function getWithdrawalFee() {
  * @param {number} fiatAmount - Amount in fiat currency to spend (e.g., 35)
  * @param {number} tradingFeePercent - Trading fee percentage (e.g., 0.1 for 0.1%, 0.2 for 0.2%)
  * @param {string} currency - Currency code (e.g., 'EUR', 'USD', 'GBP')
+ * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<Object>} Order result with execution details
  */
-export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, currency = 'EUR') {
-  const client = await getBinanceClient();
+export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, currency = 'EUR', userId) {
+  const client = await getBinanceClient(userId);
 
   try {
     // Get the Binance trading pair for this currency

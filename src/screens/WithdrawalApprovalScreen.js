@@ -16,9 +16,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { executeWithdrawal, getWithdrawalFee, getSelectedExchange, getExchangeInfo } from '../services/exchangeService';
 import { dcaAPI, authAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function WithdrawalApprovalScreen({ route, navigation }) {
   const { colors } = useTheme();
+  const { user } = useAuth();
+  const userId = user?._id;
   const { withdrawalData } = route.params;
   const [loading, setLoading] = useState(false);
   const [networkFee, setNetworkFee] = useState(0);
@@ -51,7 +54,7 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
 
   const loadExchangeInfo = async () => {
     try {
-      const selectedExchange = await getSelectedExchange();
+      const selectedExchange = await getSelectedExchange(userId);
       setExchange(selectedExchange);
       const info = getExchangeInfo(selectedExchange);
       setExchangeName(info?.name || 'your exchange');
@@ -91,7 +94,7 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
 
   const fetchNetworkFee = async (exchangeId = 'binance') => {
     try {
-      const fee = await getWithdrawalFee(exchangeId);
+      const fee = await getWithdrawalFee(exchangeId, userId);
       setNetworkFee(fee);
     } catch (error) {
       console.error('Error fetching fee:', error);
@@ -172,7 +175,8 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
         exchange,
         withdrawalData.address,
         withdrawalData.btcAmount,
-        'BTC'
+        'BTC',
+        userId
       );
 
       if (result.success) {

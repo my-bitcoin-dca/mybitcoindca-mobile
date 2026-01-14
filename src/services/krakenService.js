@@ -5,6 +5,15 @@ import { getKrakenPair } from '../utils/currency';
 const KRAKEN_API_URL = 'https://api.kraken.com';
 
 /**
+ * Get storage key with optional user namespace
+ * @param {string} baseKey - The base key name
+ * @param {string} userId - Optional user ID for namespacing
+ */
+function getStorageKey(baseKey, userId) {
+  return userId ? `${baseKey}_${userId}` : baseKey;
+}
+
+/**
  * Generate Kraken API signature
  * Kraken uses HMAC-SHA512 with a specific signing method:
  * HMAC-SHA512 of (URI path + SHA256(nonce + POST data)) using base64-decoded API secret
@@ -26,10 +35,13 @@ function getKrakenSignature(path, postData, secret, nonce) {
 
 /**
  * Make authenticated Kraken API request
+ * @param {string} endpoint - API endpoint
+ * @param {object} params - Request parameters
+ * @param {string} userId - User ID for namespaced key storage
  */
-async function krakenRequest(endpoint, params = {}) {
-  const apiKey = await storage.getItem('kraken_api_key');
-  const apiSecret = await storage.getItem('kraken_api_secret');
+async function krakenRequest(endpoint, params = {}, userId = null) {
+  const apiKey = await storage.getItem(getStorageKey('kraken_api_key', userId));
+  const apiSecret = await storage.getItem(getStorageKey('kraken_api_secret', userId));
 
   if (!apiKey || !apiSecret) {
     throw new Error('Kraken API keys not found. Please configure them first.');
@@ -80,36 +92,40 @@ async function krakenPublicRequest(endpoint, params = {}) {
  * Store Kraken API keys securely on device
  * @param {string} apiKey - Kraken API key
  * @param {string} apiSecret - Kraken API secret (private key)
+ * @param {string} userId - User ID for namespaced key storage
  */
-export async function storeKrakenKeys(apiKey, apiSecret) {
-  await storage.setItem('kraken_api_key', apiKey);
-  await storage.setItem('kraken_api_secret', apiSecret);
+export async function storeKrakenKeys(apiKey, apiSecret, userId) {
+  await storage.setItem(getStorageKey('kraken_api_key', userId), apiKey);
+  await storage.setItem(getStorageKey('kraken_api_secret', userId), apiSecret);
 }
 
 /**
  * Check if Kraken API keys are stored
+ * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<boolean>}
  */
-export async function hasKrakenKeys() {
-  const apiKey = await storage.getItem('kraken_api_key');
+export async function hasKrakenKeys(userId) {
+  const apiKey = await storage.getItem(getStorageKey('kraken_api_key', userId));
   return !!apiKey;
 }
 
 /**
  * Delete Kraken API keys from device
+ * @param {string} userId - User ID for namespaced key storage
  */
-export async function deleteKrakenKeys() {
-  await storage.deleteItem('kraken_api_key');
-  await storage.deleteItem('kraken_api_secret');
+export async function deleteKrakenKeys(userId) {
+  await storage.deleteItem(getStorageKey('kraken_api_key', userId));
+  await storage.deleteItem(getStorageKey('kraken_api_secret', userId));
 }
 
 /**
  * Get account balances
+ * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<Object>} Account info with balances
  */
-export async function getAccountBalances() {
+export async function getAccountBalances(userId) {
   try {
-    const balances = await krakenRequest('Balance');
+    const balances = await krakenRequest('Balance', {}, userId);
 
     // Convert Kraken balance format to array format similar to Binance
     const balanceArray = Object.entries(balances)
@@ -135,15 +151,16 @@ export async function getAccountBalances() {
 
 /**
  * Get withdrawal fee for BTC
+ * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<number>} Network fee
  */
-export async function getWithdrawalFee() {
+export async function getWithdrawalFee(userId) {
   try {
     const fees = await krakenRequest('WithdrawInfo', {
       asset: 'XBT',
       key: 'default', // This requires a pre-configured withdrawal address in Kraken
       amount: '0.001',
-    });
+    }, userId);
     return parseFloat(fees.fee);
   } catch (error) {
     console.error('Error fetching Kraken withdrawal fee:', error);
@@ -158,9 +175,10 @@ export async function getWithdrawalFee() {
  *
  * @param {string} address - Bitcoin withdrawal address (must be whitelisted in Kraken as a "key")
  * @param {number} amount - Amount in BTC to withdraw
+ * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<Object>} Withdrawal result
  */
-export async function executeWithdrawal(address, amount) {
+export async function executeWithdrawal(address, amount, userId) {
   try {
     // Kraken uses "keys" (named withdrawal addresses) instead of raw addresses
     // The address parameter here should be the key name configured in Kraken
@@ -168,7 +186,7 @@ export async function executeWithdrawal(address, amount) {
       asset: 'XBT',
       key: address, // This is the withdrawal address key name in Kraken
       amount: amount.toString(),
-    });
+    }, userId);
 
     return {
       success: true,
@@ -192,9 +210,10 @@ export async function executeWithdrawal(address, amount) {
  * @param {number} fiatAmount - Amount in fiat currency to spend (e.g., 35)
  * @param {number} tradingFeePercent - Trading fee percentage (e.g., 0.1 for 0.1%, 0.26 for 0.26%)
  * @param {string} currency - Currency code (e.g., 'EUR', 'USD', 'GBP')
+ * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<Object>} Order result with execution details
  */
-export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.26, currency = 'EUR') {
+export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.26, currency = 'EUR', userId = null) {
   try {
     // Get the Kraken trading pair for this currency
     const pair = getKrakenPair(currency);
@@ -239,7 +258,7 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.26, cur
       type: 'buy',
       ordertype: 'market',
       volume: quantity,
-    });
+    }, userId);
 
     // Get order details
     const txid = order.txid[0];
@@ -256,7 +275,7 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.26, cur
       // Market orders execute immediately, but we may need to wait a moment
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const closedOrders = await krakenRequest('ClosedOrders');
+      const closedOrders = await krakenRequest('ClosedOrders', {}, userId);
       const orderDetails = closedOrders.closed[txid];
 
       if (orderDetails) {

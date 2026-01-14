@@ -11,10 +11,13 @@ import {
 import { executeMarketBuy, getSelectedExchange, getExchangeInfo } from '../services/exchangeService';
 import { dcaAPI, authAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getBinancePair, getKrakenPair, getCurrencySymbol } from '../utils/currency';
 
 export default function TradeExecutionScreen({ route, navigation }) {
   const { colors } = useTheme();
+  const { user } = useAuth();
+  const userId = user?._id;
   const { tradeData, anomalyData } = route.params || {};
 
   // If coming from anomaly alert without tradeData, use a default amount
@@ -38,7 +41,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
     try {
       const [response, selectedExchange] = await Promise.all([
         authAPI.getSettings(),
-        getSelectedExchange(),
+        getSelectedExchange(userId),
       ]);
 
       const userExchange = response.success ? (response.data.settings.exchange || selectedExchange) : selectedExchange;
@@ -56,7 +59,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
     } catch (error) {
       console.error('Error loading trading fee:', error);
       // Use defaults - but still try to get selected exchange from local storage
-      const fallbackExchange = await getSelectedExchange();
+      const fallbackExchange = await getSelectedExchange(userId);
       setExchange(fallbackExchange);
       const exchangeInfo = getExchangeInfo(fallbackExchange);
       const defaultFee = exchangeInfo?.tradingFee || 0.1;
@@ -124,7 +127,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
     setLoading(true);
     try {
       const fiatAmount = effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount;
-      const result = await executeMarketBuy(exchange, fiatAmount, tradingFeePercent, currency);
+      const result = await executeMarketBuy(exchange, fiatAmount, tradingFeePercent, currency, userId);
 
       if (result.success) {
         const currencySymbol = getCurrencySymbol(currency);

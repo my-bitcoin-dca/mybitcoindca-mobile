@@ -32,8 +32,9 @@ export default function HomeScreen({ navigation }) {
   );
 
   const checkSetup = async () => {
-    const exchange = await getSelectedExchange();
-    const keys = await hasExchangeKeys(exchange);
+    const userId = user?._id;
+    const exchange = await getSelectedExchange(userId);
+    const keys = await hasExchangeKeys(exchange, userId);
     setHasKeys(keys);
   };
 

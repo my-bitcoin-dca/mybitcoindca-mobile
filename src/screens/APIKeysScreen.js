@@ -25,9 +25,12 @@ import {
 } from '../services/exchangeService';
 import { authAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function APIKeysScreen({ navigation }) {
   const { colors } = useTheme();
+  const { user } = useAuth();
+  const userId = user?._id;
   const [selectedExchangeId, setSelectedExchangeId] = useState('binance');
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
@@ -55,13 +58,13 @@ export default function APIKeysScreen({ navigation }) {
         setSelectedExchangeId(response.data.settings.exchange);
       } else {
         // Fall back to local storage
-        const stored = await getSelectedExchange();
+        const stored = await getSelectedExchange(userId);
         console.log('[APIKeys] Falling back to local storage:', stored);
         setSelectedExchangeId(stored);
       }
     } catch (error) {
       console.error('Error loading exchange settings:', error);
-      const stored = await getSelectedExchange();
+      const stored = await getSelectedExchange(userId);
       console.log('[APIKeys] Error fallback to local storage:', stored);
       setSelectedExchangeId(stored);
     } finally {
@@ -70,14 +73,14 @@ export default function APIKeysScreen({ navigation }) {
   };
 
   const checkKeys = async () => {
-    const exists = await hasExchangeKeys(selectedExchangeId);
+    const exists = await hasExchangeKeys(selectedExchangeId, userId);
     setHasKeys(exists);
   };
 
   const handleExchangeChange = async (exchangeId) => {
     console.log('[APIKeys] Changing exchange to:', exchangeId);
     setSelectedExchangeId(exchangeId);
-    await setSelectedExchange(exchangeId);
+    await setSelectedExchange(exchangeId, userId);
     console.log('[APIKeys] Saved to local storage');
 
     // Save to server
@@ -101,7 +104,7 @@ export default function APIKeysScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await storeExchangeKeys(selectedExchangeId, apiKey.trim(), apiSecret.trim());
+      await storeExchangeKeys(selectedExchangeId, apiKey.trim(), apiSecret.trim(), userId);
       setHasKeys(true);
       setApiKey('');
       setApiSecret('');
@@ -117,7 +120,7 @@ export default function APIKeysScreen({ navigation }) {
   const handleTestKeys = async () => {
     setTesting(true);
     try {
-      const result = await getAccountBalances(selectedExchangeId);
+      const result = await getAccountBalances(selectedExchangeId, userId);
       if (result.success) {
         const exchangeName = getExchangeInfo(selectedExchangeId).name;
         Alert.alert(
@@ -146,7 +149,7 @@ export default function APIKeysScreen({ navigation }) {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await deleteExchangeKeys(selectedExchangeId);
+            await deleteExchangeKeys(selectedExchangeId, userId);
             setHasKeys(false);
             Alert.alert('Deleted', 'API keys have been removed');
           },
