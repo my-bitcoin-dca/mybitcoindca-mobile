@@ -72,6 +72,9 @@ export default function SettingsScreen({ navigation }) {
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
   const [isDisabling2FA, setIsDisabling2FA] = useState(false);
 
+  // Subscription state
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -79,9 +82,10 @@ export default function SettingsScreen({ navigation }) {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const [settingsResponse, twoFAResponse] = await Promise.all([
+      const [settingsResponse, twoFAResponse, subscriptionResponse] = await Promise.all([
         authAPI.getSettings(),
         authAPI.get2FAStatus(),
+        authAPI.getSubscriptionStatus(),
       ]);
 
       if (settingsResponse.success) {
@@ -102,6 +106,10 @@ export default function SettingsScreen({ navigation }) {
 
       if (twoFAResponse.success) {
         setTwoFactorEnabled(twoFAResponse.data.enabled);
+      }
+
+      if (subscriptionResponse.success) {
+        setHasActiveSubscription(subscriptionResponse.data.hasActiveSubscription || false);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -524,17 +532,17 @@ export default function SettingsScreen({ navigation }) {
         <Text style={styles.sectionTitle}>Push Notifications</Text>
 
         {/* Anomaly Alerts */}
-        <View style={styles.inputGroup}>
+        <View style={[styles.inputGroup, !hasActiveSubscription && styles.disabledInputGroup]}>
           <View style={styles.settingRow}>
             <View style={styles.settingLeft}>
               <Ionicons
                 name="notifications"
                 size={24}
-                color={colors.secondary}
+                color={hasActiveSubscription ? colors.secondary : colors.textTertiary}
                 style={styles.settingIcon}
               />
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Anomaly Alerts (Beta)</Text>
+                <Text style={[styles.label, !hasActiveSubscription && styles.disabledLabel]}>Anomaly Alerts (Beta)</Text>
                 <Text style={styles.description}>
                   Get notified when unusual market conditions present buying opportunities
                 </Text>
@@ -545,22 +553,23 @@ export default function SettingsScreen({ navigation }) {
               onValueChange={handleAnomalyAlertsChange}
               trackColor={{ false: colors.border, true: colors.secondary }}
               thumbColor="#fff"
+              disabled={!hasActiveSubscription}
             />
           </View>
         </View>
 
         {/* Withdrawal Reminders */}
-        <View style={styles.inputGroup}>
+        <View style={[styles.inputGroup, !hasActiveSubscription && styles.disabledInputGroup]}>
           <View style={styles.settingRow}>
             <View style={styles.settingLeft}>
               <Ionicons
                 name="wallet"
                 size={24}
-                color={colors.secondary}
+                color={hasActiveSubscription ? colors.secondary : colors.textTertiary}
                 style={styles.settingIcon}
               />
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Withdrawal Reminders</Text>
+                <Text style={[styles.label, !hasActiveSubscription && styles.disabledLabel]}>Withdrawal Reminders</Text>
                 <Text style={styles.description}>
                   Get reminded when it's time to withdraw to your hardware wallet
                 </Text>
@@ -571,22 +580,23 @@ export default function SettingsScreen({ navigation }) {
               onValueChange={handleWithdrawalRemindersChange}
               trackColor={{ false: colors.border, true: colors.secondary }}
               thumbColor="#fff"
+              disabled={!hasActiveSubscription}
             />
           </View>
         </View>
 
         {/* Purchase Confirmations */}
-        <View style={styles.inputGroup}>
+        <View style={[styles.inputGroup, !hasActiveSubscription && styles.disabledInputGroup]}>
           <View style={styles.settingRow}>
             <View style={styles.settingLeft}>
               <Ionicons
                 name="checkmark-circle"
                 size={24}
-                color={colors.secondary}
+                color={hasActiveSubscription ? colors.secondary : colors.textTertiary}
                 style={styles.settingIcon}
               />
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Purchase Confirmations</Text>
+                <Text style={[styles.label, !hasActiveSubscription && styles.disabledLabel]}>Purchase Confirmations</Text>
                 <Text style={styles.description}>
                   Get notified when your scheduled DCA purchases are executed
                 </Text>
@@ -597,9 +607,28 @@ export default function SettingsScreen({ navigation }) {
               onValueChange={handlePurchaseConfirmationsChange}
               trackColor={{ false: colors.border, true: colors.secondary }}
               thumbColor="#fff"
+              disabled={!hasActiveSubscription}
             />
           </View>
         </View>
+
+        {/* Subscription Required Notice */}
+        {!hasActiveSubscription && (
+          <TouchableOpacity
+            style={styles.subscriptionNotice}
+            onPress={() => Linking.openURL('https://www.mybitcoindca.com/pricing')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="rocket" size={20} color={colors.primary} style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.subscriptionNoticeText}>
+                <Text style={{ fontWeight: '600' }}>Get Started: </Text>
+                Subscribe to begin your DCA journey and receive alerts.
+              </Text>
+              <Text style={styles.subscriptionNoticeLink}>View Plans →</Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
         <Text style={styles.sectionTitle}>Withdrawal Settings</Text>
 
@@ -904,6 +933,33 @@ const createStyles = (colors) => StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+  },
+  disabledInputGroup: {
+    opacity: 0.6,
+  },
+  disabledLabel: {
+    color: colors.textTertiary,
+  },
+  subscriptionNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  subscriptionNoticeText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  subscriptionNoticeLink: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    marginTop: 4,
   },
   settingRow: {
     flexDirection: 'row',

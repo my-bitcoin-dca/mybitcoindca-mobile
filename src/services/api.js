@@ -239,6 +239,11 @@ export const authAPI = {
     const response = await api.post('/auth/2fa/verify', { code });
     return response.data;
   },
+
+  getSubscriptionStatus: async () => {
+    const response = await api.get('/subscription/status');
+    return response.data;
+  },
 };
 
 // DCA API calls
