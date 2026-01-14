@@ -2,6 +2,42 @@ import Binance from 'binance-api-react-native';
 import storage from '../utils/storage';
 import { getBinancePair } from '../utils/currency';
 
+// Cache for server time offset to avoid fetching on every request
+let serverTimeOffset = null;
+let lastTimeSyncAt = null;
+const TIME_SYNC_INTERVAL = 5 * 60 * 1000; // Re-sync every 5 minutes
+
+/**
+ * Fetch Binance server time and calculate offset from device time
+ * This is needed because mobile device clocks can drift significantly
+ */
+async function syncServerTime() {
+  try {
+    const response = await fetch('https://api.binance.com/api/v3/time');
+    const data = await response.json();
+    const serverTime = data.serverTime;
+    const localTime = Date.now();
+    serverTimeOffset = serverTime - localTime;
+    lastTimeSyncAt = localTime;
+    console.log(`[Binance] Time synced. Offset: ${serverTimeOffset}ms`);
+    return serverTimeOffset;
+  } catch (error) {
+    console.error('[Binance] Failed to sync server time:', error);
+    return 0;
+  }
+}
+
+/**
+ * Get current server time offset, re-syncing if needed
+ */
+async function getServerTimeOffset() {
+  const now = Date.now();
+  if (serverTimeOffset === null || !lastTimeSyncAt || (now - lastTimeSyncAt) > TIME_SYNC_INTERVAL) {
+    await syncServerTime();
+  }
+  return serverTimeOffset || 0;
+}
+
 /**
  * Get Binance client using keys stored on device
  * These are FULL-ACCESS keys (including withdrawal permissions)
@@ -15,11 +51,15 @@ export async function getBinanceClient() {
     throw new Error('Binance API keys not found. Please configure them first.');
   }
 
+  // Sync with Binance server time before creating client
+  const timeOffset = await getServerTimeOffset();
+
   return Binance({
     apiKey,
     apiSecret,
-    useServerTime: true, // Sync with Binance server time to avoid timestamp errors
+    useServerTime: false, // Disable - we handle time sync manually
     recvWindow: 60000, // Allow 60 second window for clock drift
+    getTime: () => Date.now() + timeOffset, // Custom time function with offset
   });
 }
 
