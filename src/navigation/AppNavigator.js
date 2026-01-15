@@ -27,7 +27,7 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled }, ref) => {
-  const { isAuthenticated, passcodeLocked, loading, hasPasscode } = useAuth();
+  const { isAuthenticated, passcodeLocked, loading, hasPasscode, user } = useAuth();
   const { colors } = useTheme();
   const [needsPasscodeSetup, setNeedsPasscodeSetup] = useState(false);
   const [isNavigationReady, setIsNavigationReady] = useState(false);
@@ -71,6 +71,17 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
       !needsPasscodeSetup &&
       ref?.current
     ) {
+      // Validate that the notification belongs to the current user
+      const notificationUserId = pendingNotification.params?.tradeData?.userId ||
+                                  pendingNotification.params?.withdrawalData?.userId ||
+                                  pendingNotification.params?.anomalyData?.userId;
+
+      // If notification has a userId and it doesn't match current user, wait for correct user
+      if (notificationUserId && user?._id && notificationUserId !== user._id) {
+        console.log('[AppNavigator] Notification is for different user, keeping pending');
+        return;
+      }
+
       // Delay to ensure navigation stack is fully mounted after passcode unlock
       // The stack completely changes from PasscodeUnlock to MainTabs + modals
       const timeout = setTimeout(() => {
@@ -80,7 +91,7 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
 
       return () => clearTimeout(timeout);
     }
-  }, [pendingNotification, isNavigationReady, isAuthenticated, passcodeLocked, needsPasscodeSetup, onNotificationHandled, ref]);
+  }, [pendingNotification, isNavigationReady, isAuthenticated, passcodeLocked, needsPasscodeSetup, onNotificationHandled, ref, user]);
 
   // Bottom Tab Navigator for main screens
   function MainTabs() {

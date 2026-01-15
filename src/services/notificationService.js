@@ -113,6 +113,7 @@ export function parseWithdrawalNotification(notification) {
       address: data.address,
       requestId: data.requestId,
       appWithdrawal: data.appWithdrawal,
+      userId: data.userId,
     };
   }
 
@@ -133,6 +134,7 @@ export function parseTradeExecutionNotification(notification) {
       eurAmount: data.eurAmount,
       requestId: data.requestId,
       scheduledTime: data.scheduledTime,
+      userId: data.userId,
     };
   }
 
@@ -157,6 +159,7 @@ export function parseAnomalyAlertNotification(notification) {
       expectedReturn: data.expectedReturn,
       priceChange: data.priceChange,
       currency: data.currency,
+      userId: data.userId,
     };
   }
 
