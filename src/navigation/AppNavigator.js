@@ -15,6 +15,7 @@ import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import PasscodeScreen from '../screens/PasscodeScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 import HomeScreen from '../screens/HomeScreen';
 import APIKeysScreen from '../screens/APIKeysScreen';
 import WithdrawalApprovalScreen from '../screens/WithdrawalApprovalScreen';
@@ -31,26 +32,32 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
   const { colors } = useTheme();
   const [needsPasscodeSetup, setNeedsPasscodeSetup] = useState(false);
   const [isNavigationReady, setIsNavigationReady] = useState(false);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
-  const [checkingDisclaimer, setCheckingDisclaimer] = useState(true);
+  const [checkingStatus, setCheckingStatus] = useState(true);
 
   useEffect(() => {
-    checkDisclaimerStatus();
+    checkOnboardingAndDisclaimerStatus();
   }, []);
 
   useEffect(() => {
     checkPasscodeSetup();
   }, [isAuthenticated, passcodeLocked]);
 
-  const checkDisclaimerStatus = async () => {
+  const checkOnboardingAndDisclaimerStatus = async () => {
     try {
-      const accepted = await storage.getItem('disclaimer_accepted');
-      setDisclaimerAccepted(accepted === 'true');
+      const [onboarding, disclaimer] = await Promise.all([
+        storage.getItem('onboarding_completed'),
+        storage.getItem('disclaimer_accepted'),
+      ]);
+      setOnboardingCompleted(onboarding === 'true');
+      setDisclaimerAccepted(disclaimer === 'true');
     } catch (error) {
-      console.error('Error checking disclaimer:', error);
+      console.error('Error checking status:', error);
+      setOnboardingCompleted(false);
       setDisclaimerAccepted(false);
     } finally {
-      setCheckingDisclaimer(false);
+      setCheckingStatus(false);
     }
   };
 
@@ -204,7 +211,7 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
     );
   }
 
-  if (loading || checkingDisclaimer) {
+  if (loading || checkingStatus) {
     return null; // Or a loading screen
   }
 
@@ -221,6 +228,21 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
             <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
             <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           </>
+        ) : !onboardingCompleted ? (
+          <Stack.Screen name="Onboarding">
+            {(props) => (
+              <OnboardingScreen
+                {...props}
+                navigation={{
+                  ...props.navigation,
+                  replace: async (screen) => {
+                    await storage.setItem('onboarding_completed', 'true');
+                    setOnboardingCompleted(true);
+                  },
+                }}
+              />
+            )}
+          </Stack.Screen>
         ) : !disclaimerAccepted ? (
           <Stack.Screen name="Disclaimer">
             {(props) => (

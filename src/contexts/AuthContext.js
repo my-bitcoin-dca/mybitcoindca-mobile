@@ -140,6 +140,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       await storage.deleteItem('accessToken');
       await storage.deleteItem('disclaimer_accepted');
+      await storage.deleteItem('onboarding_completed');
       setUser(null);
       setIsAuthenticated(false);
       setPasscodeLocked(true);
