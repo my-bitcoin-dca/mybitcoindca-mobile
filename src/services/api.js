@@ -274,4 +274,32 @@ export const dcaAPI = {
   },
 };
 
+// Awards API calls
+export const awardsAPI = {
+  getAwards: async () => {
+    const response = await api.get('/awards');
+    return response.data;
+  },
+
+  checkAwards: async () => {
+    const response = await api.post('/awards/check');
+    return response.data;
+  },
+
+  getStats: async () => {
+    const response = await api.get('/awards/stats');
+    return response.data;
+  },
+
+  getUnnotified: async () => {
+    const response = await api.get('/awards/unnotified');
+    return response.data;
+  },
+
+  markNotified: async (awardId) => {
+    const response = await api.post(`/awards/${awardId}/notified`);
+    return response.data;
+  },
+};
+
 export default api;

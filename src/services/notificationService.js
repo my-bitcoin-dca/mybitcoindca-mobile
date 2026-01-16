@@ -165,3 +165,25 @@ export function parseAnomalyAlertNotification(notification) {
 
   return null;
 }
+
+/**
+ * Handle an award unlocked notification
+ * Parse the notification data for award notifications
+ * @param {Object} notification - Notification object
+ * @returns {Object|null} Award data or null
+ */
+export function parseAwardUnlockedNotification(notification) {
+  const data = notification.request.content.data;
+
+  if (data.type === 'award_unlocked') {
+    return {
+      awardId: data.awardId,
+      awardName: data.awardName,
+      awardDescription: data.awardDescription,
+      awardIcon: data.awardIcon,
+      userId: data.userId,
+    };
+  }
+
+  return null;
+}

@@ -21,6 +21,7 @@ import APIKeysScreen from '../screens/APIKeysScreen';
 import WithdrawalApprovalScreen from '../screens/WithdrawalApprovalScreen';
 import TradeExecutionScreen from '../screens/TradeExecutionScreen';
 import TransactionsScreen from '../screens/TransactionsScreen';
+import AwardsScreen from '../screens/AwardsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import storage from '../utils/storage';
 
@@ -186,6 +187,22 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
             tabBarIcon: ({ color, size, focused }) => (
               <Ionicons
                 name={focused ? 'key' : 'key-outline'}
+                size={24}
+                color={color}
+              />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Awards"
+          component={AwardsScreen}
+          options={{
+            title: 'Awards',
+            headerShown: true,
+            headerTitle: 'Awards',
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name={focused ? 'trophy' : 'trophy-outline'}
                 size={24}
                 color={color}
               />
