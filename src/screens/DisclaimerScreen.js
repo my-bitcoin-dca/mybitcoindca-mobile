@@ -14,6 +14,18 @@ export default function DisclaimerScreen({ onAccept }) {
   const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [scrolledToBottom, setScrolledToBottom] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [scrollViewHeight, setScrollViewHeight] = useState(0);
+
+  // Check if content fits on screen (no scrolling needed) - important for iPad
+  const checkIfContentFits = (viewHeight, totalContentHeight) => {
+    if (viewHeight > 0 && totalContentHeight > 0 && !scrolledToBottom) {
+      // If content fits on screen without scrolling, enable the button
+      if (totalContentHeight <= viewHeight + 50) {
+        setScrolledToBottom(true);
+      }
+    }
+  };
 
   const handleAccept = async () => {
     setLoading(true);
@@ -40,6 +52,17 @@ export default function DisclaimerScreen({ onAccept }) {
     }
   };
 
+  const handleLayout = (event) => {
+    const { height } = event.nativeEvent.layout;
+    setScrollViewHeight(height);
+    checkIfContentFits(height, contentHeight);
+  };
+
+  const handleContentSizeChange = (width, height) => {
+    setContentHeight(height);
+    checkIfContentFits(scrollViewHeight, height);
+  };
+
   const styles = createStyles(colors);
 
   return (
@@ -54,6 +77,8 @@ export default function DisclaimerScreen({ onAccept }) {
         contentContainerStyle={styles.scrollContent}
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        onLayout={handleLayout}
+        onContentSizeChange={handleContentSizeChange}
       >
         {/* Not an Exchange */}
         <View style={styles.section}>
