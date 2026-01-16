@@ -144,6 +144,9 @@ export default function TradeExecutionScreen({ route, navigation }) {
             tradingFeeBtc: result.data.tradingFeeBtc, // Fee in BTC (actual deducted amount)
             timestamp: result.data.timestamp,
             exchange: exchange,
+            // Award tracking data
+            isAnomalyPurchase: !!anomalyData,
+            notificationTimestamp: tradeData?.scheduledTime || null,
           });
         } catch (reportError) {
           console.error('Failed to report trade to server:', reportError);

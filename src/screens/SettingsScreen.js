@@ -18,7 +18,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import QRCode from 'react-native-qrcode-svg';
-import { authAPI } from '../services/api';
+import { authAPI, awardsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '../utils/currency';
@@ -194,6 +194,16 @@ export default function SettingsScreen({ navigation }) {
       return;
     }
     await saveSettings({ hardwareWalletAddress: trimmedAddress });
+
+    // Check for awards after saving a valid BTC address
+    if (trimmedAddress) {
+      try {
+        await awardsAPI.checkAwards();
+      } catch (error) {
+        // Silently fail - awards are not critical
+        console.log('Award check failed:', error);
+      }
+    }
   };
 
   const isValidBitcoinAddress = (address) => {
