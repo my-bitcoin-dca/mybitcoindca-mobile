@@ -45,6 +45,8 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         // Register push notifications after successful login
         await registerPushToken();
+        // Sync country from local storage to server
+        await syncCountryToServer();
         return { success: true };
       }
       return { success: false, message: response.message };
@@ -65,6 +67,8 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         // Register push notifications after successful registration
         await registerPushToken();
+        // Sync country from local storage to server
+        await syncCountryToServer();
         return { success: true };
       }
       return { success: false, message: response.message };
@@ -85,6 +89,8 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         // Register push notifications after successful Google login
         await registerPushToken();
+        // Sync country from local storage to server
+        await syncCountryToServer();
         return { success: true };
       }
       return { success: false, message: response.message };
@@ -224,6 +230,20 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.log('[Auth] Push notification registration failed:', error);
       // Don't fail auth if push registration fails
+    }
+  };
+
+  // Helper function to sync country from local storage to server
+  const syncCountryToServer = async () => {
+    try {
+      const storedCountry = await storage.getItem('user_country');
+      if (storedCountry) {
+        await authAPI.updateSettings({ country: storedCountry });
+        console.log('[Auth] Country synced to server:', storedCountry);
+      }
+    } catch (error) {
+      console.log('[Auth] Country sync failed:', error);
+      // Don't fail auth if country sync fails
     }
   };
 
