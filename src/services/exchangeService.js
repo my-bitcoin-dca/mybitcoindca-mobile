@@ -6,9 +6,10 @@
 import * as binanceService from './binanceService';
 import * as krakenService from './krakenService';
 import storage from '../utils/storage';
+import { getAvailableExchanges as getCountryExchanges } from '../config/countries';
 
 // Exchange configuration
-export const EXCHANGES = [
+const ALL_EXCHANGES = [
   {
     id: 'binance',
     name: 'Binance',
@@ -27,11 +28,49 @@ export const EXCHANGES = [
   },
 ];
 
+// For backwards compatibility, export all exchanges
+export const EXCHANGES = ALL_EXCHANGES;
+
+/**
+ * Get available exchanges for a specific country
+ * @param {string} countryCode - ISO country code
+ * @returns {Array} Array of exchange objects available in the country
+ */
+export function getExchangesForCountry(countryCode) {
+  if (!countryCode) {
+    return ALL_EXCHANGES; // Return all if no country set
+  }
+  const availableIds = getCountryExchanges(countryCode);
+  return ALL_EXCHANGES.filter(e => availableIds.includes(e.id));
+}
+
+/**
+ * Get available exchanges for user based on stored country
+ * @param {string} userId - User ID for namespaced storage
+ * @returns {Promise<Array>} Array of exchange objects available for the user
+ */
+export async function getAvailableExchangesForUser(userId) {
+  const countryCode = await storage.getItem('user_country');
+  return getExchangesForCountry(countryCode);
+}
+
+/**
+ * Check if an exchange is available for the user's country
+ * @param {string} exchangeId - Exchange identifier
+ * @param {string} countryCode - ISO country code
+ * @returns {boolean} True if exchange is available
+ */
+export function isExchangeAvailable(exchangeId, countryCode) {
+  if (!countryCode) return true; // Allow if no country set
+  const availableIds = getCountryExchanges(countryCode);
+  return availableIds.includes(exchangeId);
+}
+
 /**
  * Get exchange info by ID
  */
 export function getExchangeInfo(exchangeId) {
-  return EXCHANGES.find(e => e.id === exchangeId) || EXCHANGES[0];
+  return ALL_EXCHANGES.find(e => e.id === exchangeId) || ALL_EXCHANGES[0];
 }
 
 /**

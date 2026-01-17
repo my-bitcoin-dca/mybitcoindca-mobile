@@ -22,6 +22,7 @@ import { authAPI, awardsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '../utils/currency';
+import { COUNTRIES, getAvailableExchanges, getCountryName, getCountryFlag } from '../config/countries';
 import storage from '../utils/storage';
 
 const FREQUENCIES = [
@@ -51,6 +52,9 @@ export default function SettingsScreen({ navigation }) {
   const [saving, setSaving] = useState(false);
 
   // Settings state
+  const [country, setCountry] = useState('');
+  const [showCountryModal, setShowCountryModal] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
   const [currency, setCurrency] = useState('EUR');
   const [weeklyDcaAmount, setWeeklyDcaAmount] = useState('35');
   const [walletAddress, setWalletAddress] = useState('');
@@ -82,14 +86,17 @@ export default function SettingsScreen({ navigation }) {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const [settingsResponse, twoFAResponse, subscriptionResponse] = await Promise.all([
+      const [settingsResponse, twoFAResponse, subscriptionResponse, storedCountry] = await Promise.all([
         authAPI.getSettings(),
         authAPI.get2FAStatus(),
         authAPI.getSubscriptionStatus(),
+        storage.getItem('user_country'),
       ]);
 
       if (settingsResponse.success) {
         const { settings } = settingsResponse.data;
+        // Load country from server settings or local storage
+        setCountry(settings.country || storedCountry || '');
         setCurrency(settings.currency || 'EUR');
         setWeeklyDcaAmount(settings.weeklyDcaAmount?.toString() || '35');
         setWalletAddress(settings.hardwareWalletAddress || '');
@@ -133,6 +140,13 @@ export default function SettingsScreen({ navigation }) {
   };
 
   // Handlers for immediate save on change
+  const handleCountryChange = async (value) => {
+    setCountry(value);
+    await storage.setItem('user_country', value);
+    await saveSettings({ country: value });
+    setShowCountryModal(false);
+  };
+
   const handleCurrencyChange = async (value) => {
     setCurrency(value);
     await saveSettings({ currency: value });
@@ -414,6 +428,37 @@ export default function SettingsScreen({ navigation }) {
             />
           </View>
         </View>
+
+        <Text style={styles.sectionTitle}>Region</Text>
+
+        {/* Country Selector */}
+        <TouchableOpacity
+          style={styles.inputGroup}
+          onPress={() => setShowCountryModal(true)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.settingRow}>
+            <View style={styles.settingLeft}>
+              <Ionicons
+                name="globe-outline"
+                size={24}
+                color={colors.secondary}
+                style={styles.settingIcon}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Country</Text>
+                <Text style={styles.description}>
+                  {country ? `${getCountryFlag(country)} ${getCountryName(country)}` : 'Select your country'}
+                </Text>
+              </View>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.textTertiary}
+            />
+          </View>
+        </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>DCA Settings</Text>
 
@@ -903,6 +948,88 @@ export default function SettingsScreen({ navigation }) {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* Country Selection Modal */}
+      <Modal
+        visible={showCountryModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => {
+          setShowCountryModal(false);
+          setCountrySearch('');
+        }}
+      >
+        <SafeAreaView style={styles.modalFullScreen}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Country</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShowCountryModal(false);
+                setCountrySearch('');
+              }}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons name="close" size={28} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.countrySearchContainer}>
+            <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.countrySearchIcon} />
+            <TextInput
+              style={styles.countrySearchInput}
+              placeholder="Search countries..."
+              placeholderTextColor={colors.textTertiary}
+              value={countrySearch}
+              onChangeText={setCountrySearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {countrySearch.length > 0 && (
+              <TouchableOpacity onPress={() => setCountrySearch('')} style={styles.countrySearchClear}>
+                <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <ScrollView style={{ flex: 1, paddingHorizontal: 20 }} keyboardShouldPersistTaps="handled">
+            {COUNTRIES.filter(c =>
+              c.name.toLowerCase().includes(countrySearch.toLowerCase())
+            ).map((c) => {
+              const exchanges = getAvailableExchanges(c.code);
+              const hasExchanges = exchanges.length > 0;
+              const isSelected = country === c.code;
+
+              return (
+                <TouchableOpacity
+                  key={c.code}
+                  style={[
+                    styles.countryItem,
+                    isSelected && styles.countryItemSelected,
+                    !hasExchanges && styles.countryItemDisabled,
+                  ]}
+                  onPress={() => {
+                    if (hasExchanges) {
+                      handleCountryChange(c.code);
+                      setCountrySearch('');
+                    }
+                  }}
+                  disabled={!hasExchanges}
+                >
+                  <Text style={styles.countryFlag}>{getCountryFlag(c.code)}</Text>
+                  <Text style={[
+                    styles.countryName,
+                    isSelected && styles.countryNameSelected,
+                    !hasExchanges && styles.countryNameDisabled,
+                  ]}>
+                    {c.name}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1361,5 +1488,75 @@ const createStyles = (colors) => StyleSheet.create({
   },
   modalButtonDisabled: {
     opacity: 0.6,
+  },
+  // Country modal styles
+  countrySearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  countrySearchIcon: {
+    marginRight: 8,
+  },
+  countrySearchInput: {
+    flex: 1,
+    height: 44,
+    fontSize: 16,
+    color: colors.text,
+  },
+  countrySearchClear: {
+    padding: 4,
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  countryFlag: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  countryItemSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '15',
+  },
+  countryItemDisabled: {
+    opacity: 0.4,
+  },
+  countryName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  countryNameSelected: {
+    color: colors.primary,
+  },
+  countryNameDisabled: {
+    color: colors.textTertiary,
+  },
+  countryExchangeText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  countryExchangeTextSelected: {
+    color: colors.primary,
+  },
+  countryNoExchangeText: {
+    fontSize: 13,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
   },
 });

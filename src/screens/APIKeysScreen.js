@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,16 +22,21 @@ import {
   getAccountBalances,
   getApiKeyInstructions,
   getWithdrawalNotes,
+  getExchangesForCountry,
 } from '../services/exchangeService';
 import { authAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
+import storage from '../utils/storage';
 
 export default function APIKeysScreen({ navigation }) {
   const { colors } = useTheme();
   const { user } = useAuth();
   const userId = user?._id;
   const [selectedExchangeId, setSelectedExchangeId] = useState('binance');
+  const [availableExchanges, setAvailableExchanges] = useState([]);
+  const [userCountry, setUserCountry] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
   const [hasKeys, setHasKeys] = useState(false);
@@ -40,27 +45,61 @@ export default function APIKeysScreen({ navigation }) {
   const [showSecrets, setShowSecrets] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  useEffect(() => {
-    loadExchangeSettings();
-  }, []);
+  // Reload settings when screen is focused (in case country changed in Settings)
+  const hasLoadedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      loadExchangeSettings(!hasLoadedOnce.current);
+      hasLoadedOnce.current = true;
+    }, [])
+  );
 
   useEffect(() => {
     checkKeys();
   }, [selectedExchangeId]);
 
-  const loadExchangeSettings = async () => {
+  const loadExchangeSettings = async (isInitialLoad = false) => {
     try {
+      if (isInitialLoad) {
+        setInitialLoading(true);
+      }
+
+      // Load country from local storage
+      const countryCode = await storage.getItem('user_country');
+      console.log('[APIKeys] Loaded country code:', countryCode);
+      setUserCountry(countryCode || '');
+
+      // Get available exchanges based on country
+      const filteredExchanges = getExchangesForCountry(countryCode);
+      console.log('[APIKeys] Filtered exchanges for country:', filteredExchanges.map(e => e.id));
+      setAvailableExchanges(filteredExchanges);
+
       // Load from server settings
       const response = await authAPI.getSettings();
       console.log('[APIKeys] Server settings response:', JSON.stringify(response.data?.settings, null, 2));
       if (response.success && response.data?.settings?.exchange) {
-        console.log('[APIKeys] Using server exchange:', response.data.settings.exchange);
-        setSelectedExchangeId(response.data.settings.exchange);
+        const serverExchange = response.data.settings.exchange;
+        // Check if the server exchange is available in user's country
+        const isAvailable = filteredExchanges.some(e => e.id === serverExchange);
+        if (isAvailable) {
+          console.log('[APIKeys] Using server exchange:', serverExchange);
+          setSelectedExchangeId(serverExchange);
+        } else if (filteredExchanges.length > 0) {
+          // Default to first available exchange
+          console.log('[APIKeys] Server exchange not available, using:', filteredExchanges[0].id);
+          setSelectedExchangeId(filteredExchanges[0].id);
+        }
       } else {
         // Fall back to local storage
         const stored = await getSelectedExchange(userId);
-        console.log('[APIKeys] Falling back to local storage:', stored);
-        setSelectedExchangeId(stored);
+        const isAvailable = filteredExchanges.some(e => e.id === stored);
+        if (isAvailable) {
+          console.log('[APIKeys] Falling back to local storage:', stored);
+          setSelectedExchangeId(stored);
+        } else if (filteredExchanges.length > 0) {
+          console.log('[APIKeys] Stored exchange not available, using:', filteredExchanges[0].id);
+          setSelectedExchangeId(filteredExchanges[0].id);
+        }
       }
     } catch (error) {
       console.error('Error loading exchange settings:', error);
@@ -184,35 +223,44 @@ export default function APIKeysScreen({ navigation }) {
       {/* Exchange Selector */}
       <View style={styles.exchangeSelector}>
         <Text style={styles.sectionTitle}>Select Exchange</Text>
-        <View style={styles.exchangeButtons}>
-          {EXCHANGES.map((exchange) => (
-            <TouchableOpacity
-              key={exchange.id}
-              style={[
-                styles.exchangeButton,
-                selectedExchangeId === exchange.id && styles.exchangeButtonActive,
-              ]}
-              onPress={() => handleExchangeChange(exchange.id)}
-            >
-              <Text
+        {availableExchanges.length === 0 ? (
+          <View style={styles.noExchangesCard}>
+            <Ionicons name="warning-outline" size={32} color={colors.warning} />
+            <Text style={styles.noExchangesText}>
+              No exchanges are available in your region. Please update your country in Settings.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.exchangeButtons}>
+            {availableExchanges.map((exchange) => (
+              <TouchableOpacity
+                key={exchange.id}
                 style={[
-                  styles.exchangeButtonText,
-                  selectedExchangeId === exchange.id && styles.exchangeButtonTextActive,
+                  styles.exchangeButton,
+                  selectedExchangeId === exchange.id && styles.exchangeButtonActive,
                 ]}
+                onPress={() => handleExchangeChange(exchange.id)}
               >
-                {exchange.name}
-              </Text>
-              <Text
-                style={[
-                  styles.exchangeButtonDesc,
-                  selectedExchangeId === exchange.id && styles.exchangeButtonDescActive,
-                ]}
-              >
-                {exchange.description}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+                <Text
+                  style={[
+                    styles.exchangeButtonText,
+                    selectedExchangeId === exchange.id && styles.exchangeButtonTextActive,
+                  ]}
+                >
+                  {exchange.name}
+                </Text>
+                <Text
+                  style={[
+                    styles.exchangeButtonDesc,
+                    selectedExchangeId === exchange.id && styles.exchangeButtonDescActive,
+                  ]}
+                >
+                  {exchange.description}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       <View style={styles.infoCard}>
@@ -445,6 +493,21 @@ const createStyles = (colors) => StyleSheet.create({
   exchangeButtons: {
     flexDirection: 'row',
     gap: 12,
+  },
+  noExchangesCard: {
+    padding: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  noExchangesText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 20,
   },
   exchangeButton: {
     flex: 1,

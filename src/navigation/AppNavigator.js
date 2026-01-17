@@ -41,17 +41,29 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
     checkOnboardingAndDisclaimerStatus();
   }, []);
 
+  // Re-check onboarding/disclaimer status when authentication changes
+  // This ensures new accounts go through onboarding even if a previous account completed it
+  useEffect(() => {
+    if (isAuthenticated) {
+      checkOnboardingAndDisclaimerStatus();
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     checkPasscodeSetup();
   }, [isAuthenticated, passcodeLocked]);
 
   const checkOnboardingAndDisclaimerStatus = async () => {
     try {
-      const [onboarding, disclaimer] = await Promise.all([
+      setCheckingStatus(true);
+      const [onboarding, disclaimer, userCountry] = await Promise.all([
         storage.getItem('onboarding_completed'),
         storage.getItem('disclaimer_accepted'),
+        storage.getItem('user_country'),
       ]);
-      setOnboardingCompleted(onboarding === 'true');
+      // Onboarding is complete only if marked complete AND country is set
+      const isOnboardingComplete = onboarding === 'true' && !!userCountry;
+      setOnboardingCompleted(isOnboardingComplete);
       setDisclaimerAccepted(disclaimer === 'true');
     } catch (error) {
       console.error('Error checking status:', error);
