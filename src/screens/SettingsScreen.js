@@ -79,6 +79,22 @@ export default function SettingsScreen({ navigation }) {
   // Subscription state
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
 
+  // Account deletion state
+  const [showDeleteReasonModal, setShowDeleteReasonModal] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteAdditionalFeedback, setDeleteAdditionalFeedback] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const DELETE_REASONS = [
+    { value: 'thought_exchange', label: 'I thought this was an exchange' },
+    { value: 'too_expensive', label: 'Too expensive / pricing' },
+    { value: 'not_using', label: 'Not using the service' },
+    { value: 'missing_features', label: 'Missing features I need' },
+    { value: 'found_alternative', label: 'Found a better alternative' },
+    { value: 'technical_issues', label: 'Technical issues / bugs' },
+    { value: 'other', label: 'Other' },
+  ];
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -273,6 +289,14 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const confirmDeleteAccount = () => {
+    // Show the deletion reason modal first
+    setDeleteReason('');
+    setDeleteAdditionalFeedback('');
+    setShowDeleteReasonModal(true);
+  };
+
+  const handleProceedToDelete = () => {
+    setShowDeleteReasonModal(false);
     Alert.alert(
       'Confirm Account Deletion',
       'Are you absolutely sure you want to delete your account?\n\nThis will permanently remove:\n• All your purchase history\n• All withdrawal transactions\n• Your subscription (if active)\n• All settings and preferences\n• All account data\n\nThis action cannot be undone.',
@@ -293,7 +317,8 @@ export default function SettingsScreen({ navigation }) {
 
   const handleDeleteAccount = async () => {
     try {
-      const response = await authAPI.deleteAccount();
+      setDeletingAccount(true);
+      const response = await authAPI.deleteAccount(deleteReason, deleteAdditionalFeedback);
 
       if (response.success) {
         // Logout - this will clear all storage and reset auth state
@@ -306,6 +331,8 @@ export default function SettingsScreen({ navigation }) {
     } catch (error) {
       console.error('Error deleting account:', error);
       Alert.alert('Error', 'Failed to delete account. Please try again.');
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -1030,6 +1057,95 @@ export default function SettingsScreen({ navigation }) {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* Account Deletion Reason Modal */}
+      <Modal
+        visible={showDeleteReasonModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowDeleteReasonModal(false)}
+      >
+        <SafeAreaView style={styles.modalFullScreen}>
+          <ScrollView contentContainerStyle={styles.modalFullScreenContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>We're sorry to see you go</Text>
+              <TouchableOpacity
+                onPress={() => setShowDeleteReasonModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={28} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalDescription}>
+              To help us improve, please tell us why you're leaving:
+            </Text>
+
+            <View style={styles.deleteReasonList}>
+              {DELETE_REASONS.map((reason) => (
+                <TouchableOpacity
+                  key={reason.value}
+                  style={[
+                    styles.deleteReasonItem,
+                    deleteReason === reason.value && styles.deleteReasonItemSelected,
+                  ]}
+                  onPress={() => setDeleteReason(reason.value)}
+                >
+                  <View style={[
+                    styles.deleteReasonRadio,
+                    deleteReason === reason.value && styles.deleteReasonRadioSelected,
+                  ]}>
+                    {deleteReason === reason.value && (
+                      <View style={styles.deleteReasonRadioInner} />
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.deleteReasonText,
+                    deleteReason === reason.value && styles.deleteReasonTextSelected,
+                  ]}>
+                    {reason.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.codeLabel}>Additional feedback (optional)</Text>
+            <TextInput
+              style={styles.deleteFeedbackInput}
+              value={deleteAdditionalFeedback}
+              onChangeText={setDeleteAdditionalFeedback}
+              placeholder="Tell us more about your experience..."
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowDeleteReasonModal(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.deleteConfirmButton,
+                  deletingAccount && styles.modalButtonDisabled,
+                ]}
+                onPress={handleProceedToDelete}
+                disabled={deletingAccount}
+              >
+                {deletingAccount ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.deleteConfirmButtonText}>Continue</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1558,5 +1674,74 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 13,
     color: colors.textTertiary,
     fontStyle: 'italic',
+  },
+  // Delete reason modal styles
+  deleteReasonList: {
+    marginBottom: 20,
+  },
+  deleteReasonItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  deleteReasonItemSelected: {
+    borderColor: '#dc3545',
+    backgroundColor: '#dc354510',
+  },
+  deleteReasonRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.border,
+    marginRight: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteReasonRadioSelected: {
+    borderColor: '#dc3545',
+  },
+  deleteReasonRadioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#dc3545',
+  },
+  deleteReasonText: {
+    fontSize: 16,
+    color: colors.text,
+    flex: 1,
+  },
+  deleteReasonTextSelected: {
+    fontWeight: '600',
+  },
+  deleteFeedbackInput: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 120,
+    marginBottom: 24,
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    padding: 18,
+    borderRadius: 12,
+    backgroundColor: '#dc3545',
+    alignItems: 'center',
+  },
+  deleteConfirmButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

@@ -180,8 +180,10 @@ export const authAPI = {
     return response.data;
   },
 
-  deleteAccount: async () => {
-    const response = await api.delete('/auth/account');
+  deleteAccount: async (reason, additionalFeedback) => {
+    const response = await api.delete('/auth/account', {
+      data: { reason, additionalFeedback }
+    });
     return response.data;
   },
 
