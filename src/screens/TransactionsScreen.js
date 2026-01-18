@@ -153,11 +153,15 @@ export default function TransactionsScreen() {
   return (
     <View style={styles.container}>
       {isMockData && (
-        <View style={styles.mockDataBanner}>
+        <TouchableOpacity
+          style={styles.mockDataBanner}
+          onPress={() => Linking.openURL('https://www.mybitcoindca.com/pricing')}
+          activeOpacity={0.7}
+        >
           <Text style={styles.mockDataText}>
-            📊 Preview Data - Subscribe to see your real transaction history
+            📊 Preview Data - Subscribe to start DCAing and see your real transaction history
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
 
       <View style={styles.header}>

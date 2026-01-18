@@ -428,6 +428,38 @@ export default function SettingsScreen({ navigation }) {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>
+        {/* Subscription Status */}
+        <TouchableOpacity
+          style={[
+            styles.subscriptionStatusCard,
+            hasActiveSubscription && styles.subscriptionStatusCardActive,
+          ]}
+          onPress={() => Linking.openURL('https://www.mybitcoindca.com/pricing')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.subscriptionStatusContent}>
+            <Ionicons
+              name={hasActiveSubscription ? 'checkmark-circle' : 'rocket'}
+              size={28}
+              color={hasActiveSubscription ? colors.success : colors.primary}
+            />
+            <View style={styles.subscriptionStatusText}>
+              <Text style={[
+                styles.subscriptionStatusTitle,
+                hasActiveSubscription && styles.subscriptionStatusTitleActive,
+              ]}>
+                {hasActiveSubscription ? 'Subscription Active' : 'No Active Subscription'}
+              </Text>
+              <Text style={styles.subscriptionStatusSubtitle}>
+                {hasActiveSubscription
+                  ? 'Manage your subscription'
+                  : 'Subscribe to start DCAing'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+          </View>
+        </TouchableOpacity>
+
         <Text style={styles.sectionTitle}>Appearance</Text>
 
         {/* Dark Mode Toggle */}
@@ -1192,6 +1224,38 @@ const createStyles = (colors) => StyleSheet.create({
   },
   disabledLabel: {
     color: colors.textTertiary,
+  },
+  subscriptionStatusCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  subscriptionStatusCardActive: {
+    borderColor: colors.success,
+  },
+  subscriptionStatusContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  subscriptionStatusText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  subscriptionStatusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  subscriptionStatusTitleActive: {
+    color: colors.success,
+  },
+  subscriptionStatusSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
   subscriptionNotice: {
     flexDirection: 'row',
