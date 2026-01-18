@@ -434,7 +434,7 @@ export default function SettingsScreen({ navigation }) {
             styles.subscriptionStatusCard,
             hasActiveSubscription && styles.subscriptionStatusCardActive,
           ]}
-          onPress={() => Linking.openURL('https://www.mybitcoindca.com/pricing')}
+          onPress={() => Linking.openURL(hasActiveSubscription ? 'https://www.mybitcoindca.com/settings' : 'https://www.mybitcoindca.com/pricing')}
           activeOpacity={0.7}
         >
           <View style={styles.subscriptionStatusContent}>
