@@ -26,6 +26,8 @@ export const AuthProvider = ({ children }) => {
           setIsAuthenticated(true);
           // Register push notifications after successful auth check
           await registerPushToken();
+          // Sync onboarding/disclaimer status from server to local storage
+          await syncOnboardingStatusFromServer(response.data.user);
         }
       }
     } catch (error) {
@@ -45,7 +47,9 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         // Register push notifications after successful login
         await registerPushToken();
-        // Sync country from local storage to server
+        // Sync onboarding/disclaimer status from server to local storage
+        await syncOnboardingStatusFromServer(response.data.user);
+        // Sync country from local storage to server (in case it was set locally but not synced)
         await syncCountryToServer();
         return { success: true };
       }
@@ -67,7 +71,9 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         // Register push notifications after successful registration
         await registerPushToken();
-        // Sync country from local storage to server
+        // Sync onboarding/disclaimer status from server to local storage
+        await syncOnboardingStatusFromServer(response.data.user);
+        // Sync country from local storage to server (in case it was set locally but not synced)
         await syncCountryToServer();
         return { success: true };
       }
@@ -89,7 +95,9 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         // Register push notifications after successful Google login
         await registerPushToken();
-        // Sync country from local storage to server
+        // Sync onboarding/disclaimer status from server to local storage
+        await syncOnboardingStatusFromServer(response.data.user);
+        // Sync country from local storage to server (in case it was set locally but not synced)
         await syncCountryToServer();
         return { success: true };
       }
@@ -247,6 +255,43 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Helper function to sync onboarding/disclaimer status from server to local storage
+  const syncOnboardingStatusFromServer = async (userData) => {
+    try {
+      // Sync onboarding status
+      if (userData.onboardingCompleted) {
+        await storage.setItem('onboarding_completed', 'true');
+        console.log('[Auth] Onboarding status synced from server: completed');
+      }
+      // Sync disclaimer status
+      if (userData.disclaimerAccepted) {
+        await storage.setItem('disclaimer_accepted', 'true');
+        console.log('[Auth] Disclaimer status synced from server: accepted');
+      }
+      // Sync country if set on server
+      if (userData.settings?.country) {
+        await storage.setItem('user_country', userData.settings.country);
+        console.log('[Auth] Country synced from server:', userData.settings.country);
+      }
+    } catch (error) {
+      console.log('[Auth] Onboarding status sync failed:', error);
+      // Don't fail auth if sync fails
+    }
+  };
+
+  // Helper function to update onboarding/disclaimer status on server
+  const updateOnboardingStatus = async (onboardingCompleted, disclaimerAccepted) => {
+    try {
+      const updates = {};
+      if (onboardingCompleted !== undefined) updates.onboardingCompleted = onboardingCompleted;
+      if (disclaimerAccepted !== undefined) updates.disclaimerAccepted = disclaimerAccepted;
+      await authAPI.updateSettings(updates);
+      console.log('[Auth] Onboarding status updated on server:', updates);
+    } catch (error) {
+      console.log('[Auth] Failed to update onboarding status:', error);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -268,6 +313,8 @@ export const AuthProvider = ({ children }) => {
         checkAuth,
         requestPasscodeReset,
         confirmPasscodeReset,
+        syncCountryToServer,
+        updateOnboardingStatus,
       }}
     >
       {children}

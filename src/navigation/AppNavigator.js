@@ -29,7 +29,7 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled }, ref) => {
-  const { isAuthenticated, passcodeLocked, loading, hasPasscode, user } = useAuth();
+  const { isAuthenticated, passcodeLocked, loading, hasPasscode, user, syncCountryToServer, updateOnboardingStatus } = useAuth();
   const { colors } = useTheme();
   const [needsPasscodeSetup, setNeedsPasscodeSetup] = useState(false);
   const [isNavigationReady, setIsNavigationReady] = useState(false);
@@ -41,13 +41,14 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
     checkOnboardingAndDisclaimerStatus();
   }, []);
 
-  // Re-check onboarding/disclaimer status when authentication changes
+  // Re-check onboarding/disclaimer status when authentication or user changes
   // This ensures new accounts go through onboarding even if a previous account completed it
+  // Also re-checks when user object is loaded (contains server-side onboarding status)
   useEffect(() => {
     if (isAuthenticated) {
       checkOnboardingAndDisclaimerStatus();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     checkPasscodeSetup();
@@ -56,15 +57,28 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
   const checkOnboardingAndDisclaimerStatus = async () => {
     try {
       setCheckingStatus(true);
-      const [onboarding, disclaimer, userCountry] = await Promise.all([
-        storage.getItem('onboarding_completed'),
-        storage.getItem('disclaimer_accepted'),
-        storage.getItem('user_country'),
-      ]);
-      // Onboarding is complete only if marked complete AND country is set
-      const isOnboardingComplete = onboarding === 'true' && !!userCountry;
-      setOnboardingCompleted(isOnboardingComplete);
-      setDisclaimerAccepted(disclaimer === 'true');
+
+      // First check the user object from server (source of truth)
+      if (user?.onboardingCompleted) {
+        setOnboardingCompleted(true);
+      } else {
+        // Fall back to local storage
+        const [onboarding, userCountry] = await Promise.all([
+          storage.getItem('onboarding_completed'),
+          storage.getItem('user_country'),
+        ]);
+        // Onboarding is complete only if marked complete AND country is set
+        const isOnboardingComplete = onboarding === 'true' && !!userCountry;
+        setOnboardingCompleted(isOnboardingComplete);
+      }
+
+      if (user?.disclaimerAccepted) {
+        setDisclaimerAccepted(true);
+      } else {
+        // Fall back to local storage
+        const disclaimer = await storage.getItem('disclaimer_accepted');
+        setDisclaimerAccepted(disclaimer === 'true');
+      }
     } catch (error) {
       console.error('Error checking status:', error);
       setOnboardingCompleted(false);
@@ -266,6 +280,10 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
                   ...props.navigation,
                   replace: async (screen) => {
                     await storage.setItem('onboarding_completed', 'true');
+                    // Sync the country to server after onboarding completes
+                    await syncCountryToServer();
+                    // Save onboarding status to server
+                    await updateOnboardingStatus(true, undefined);
                     setOnboardingCompleted(true);
                   },
                 }}
@@ -277,7 +295,11 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
             {(props) => (
               <DisclaimerScreen
                 {...props}
-                onAccept={() => setDisclaimerAccepted(true)}
+                onAccept={async () => {
+                  // Save disclaimer status to server
+                  await updateOnboardingStatus(undefined, true);
+                  setDisclaimerAccepted(true);
+                }}
               />
             )}
           </Stack.Screen>
