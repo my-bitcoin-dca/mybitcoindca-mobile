@@ -170,16 +170,6 @@ export const authAPI = {
     return response.data;
   },
 
-  getSettings: async () => {
-    const response = await api.get('/auth/settings');
-    return response.data;
-  },
-
-  updateSettings: async (settings) => {
-    const response = await api.put('/auth/settings', settings);
-    return response.data;
-  },
-
   deleteAccount: async (reason, additionalFeedback) => {
     const response = await api.delete('/auth/account', {
       data: { reason, additionalFeedback }
