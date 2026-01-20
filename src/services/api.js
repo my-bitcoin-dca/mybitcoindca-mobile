@@ -236,6 +236,11 @@ export const authAPI = {
     const response = await api.get('/subscription/status');
     return response.data;
   },
+
+  claimRetentionTrial: async () => {
+    const response = await api.post('/subscription/claim-retention-trial');
+    return response.data;
+  },
 };
 
 // DCA API calls

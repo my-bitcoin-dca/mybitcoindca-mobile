@@ -78,6 +78,10 @@ export default function SettingsScreen({ navigation }) {
 
   // Subscription state
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [isManualTrial, setIsManualTrial] = useState(false);
+  const [manualTrialEnd, setManualTrialEnd] = useState(null);
+  const [canClaimRetentionTrial, setCanClaimRetentionTrial] = useState(false);
+  const [claimingTrial, setClaimingTrial] = useState(false);
 
   // Account deletion state
   const [showDeleteReasonModal, setShowDeleteReasonModal] = useState(false);
@@ -132,7 +136,11 @@ export default function SettingsScreen({ navigation }) {
       }
 
       if (subscriptionResponse.success) {
+        console.log('[Settings] Subscription status:', JSON.stringify(subscriptionResponse.data, null, 2));
         setHasActiveSubscription(subscriptionResponse.data.hasActiveSubscription || false);
+        setIsManualTrial(subscriptionResponse.data.isManualTrial || false);
+        setManualTrialEnd(subscriptionResponse.data.manualTrialEnd || null);
+        setCanClaimRetentionTrial(subscriptionResponse.data.canClaimRetentionTrial || false);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -297,6 +305,31 @@ export default function SettingsScreen({ navigation }) {
 
   const handleProceedToDelete = () => {
     setShowDeleteReasonModal(false);
+
+    // If user selected "too expensive" and is eligible for retention trial, offer it
+    if (deleteReason === 'too_expensive' && canClaimRetentionTrial) {
+      Alert.alert(
+        'Wait! Try Us Free for 14 Days',
+        'Before you go, we\'d love for you to experience the full value of My Bitcoin DCA.\n\nWe\'re offering you a complimentary 14-day trial with full access to all premium features - no payment required.\n\nGive it a try?',
+        [
+          {
+            text: 'No Thanks',
+            style: 'cancel',
+            onPress: showFinalDeleteConfirmation,
+          },
+          {
+            text: 'Claim Free Trial',
+            onPress: handleClaimRetentionTrial,
+          },
+        ],
+        { cancelable: true }
+      );
+    } else {
+      showFinalDeleteConfirmation();
+    }
+  };
+
+  const showFinalDeleteConfirmation = () => {
     Alert.alert(
       'Confirm Account Deletion',
       'Are you absolutely sure you want to delete your account?\n\nThis will permanently remove:\n• All your purchase history\n• All withdrawal transactions\n• Your subscription (if active)\n• All settings and preferences\n• All account data\n\nThis action cannot be undone.',
@@ -313,6 +346,34 @@ export default function SettingsScreen({ navigation }) {
       ],
       { cancelable: true }
     );
+  };
+
+  const handleClaimRetentionTrial = async () => {
+    try {
+      setClaimingTrial(true);
+      const response = await authAPI.claimRetentionTrial();
+
+      if (response.success) {
+        // Update local state
+        setHasActiveSubscription(true);
+        setIsManualTrial(true);
+        setManualTrialEnd(response.data.trialEnd);
+        setCanClaimRetentionTrial(false);
+
+        Alert.alert(
+          'Trial Activated!',
+          'Your 14-day free trial is now active. Enjoy full access to all premium features!\n\nWe hope you\'ll love the experience.',
+          [{ text: 'Awesome!' }]
+        );
+      } else {
+        Alert.alert('Error', response.message || 'Failed to activate trial');
+      }
+    } catch (error) {
+      console.error('Error claiming retention trial:', error);
+      Alert.alert('Error', 'Failed to activate trial. Please try again.');
+    } finally {
+      setClaimingTrial(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -432,28 +493,42 @@ export default function SettingsScreen({ navigation }) {
         <TouchableOpacity
           style={[
             styles.subscriptionStatusCard,
-            hasActiveSubscription && styles.subscriptionStatusCardActive,
+            hasActiveSubscription && !isManualTrial && styles.subscriptionStatusCardActive,
+            isManualTrial && styles.subscriptionStatusCardTrial,
           ]}
-          onPress={() => Linking.openURL(hasActiveSubscription ? 'https://www.mybitcoindca.com/settings' : 'https://www.mybitcoindca.com/pricing')}
+          onPress={() => Linking.openURL(
+            isManualTrial
+              ? 'https://www.mybitcoindca.com/pricing'
+              : hasActiveSubscription
+                ? 'https://www.mybitcoindca.com/settings'
+                : 'https://www.mybitcoindca.com/pricing'
+          )}
           activeOpacity={0.7}
         >
           <View style={styles.subscriptionStatusContent}>
             <Ionicons
-              name={hasActiveSubscription ? 'checkmark-circle' : 'rocket'}
+              name={isManualTrial ? 'time' : hasActiveSubscription ? 'checkmark-circle' : 'rocket'}
               size={28}
-              color={hasActiveSubscription ? colors.success : colors.primary}
+              color={isManualTrial ? colors.info : hasActiveSubscription ? colors.success : colors.primary}
             />
             <View style={styles.subscriptionStatusText}>
               <Text style={[
                 styles.subscriptionStatusTitle,
-                hasActiveSubscription && styles.subscriptionStatusTitleActive,
+                hasActiveSubscription && !isManualTrial && styles.subscriptionStatusTitleActive,
+                isManualTrial && styles.subscriptionStatusTitleTrial,
               ]}>
-                {hasActiveSubscription ? 'Subscription Active' : 'No Active Subscription'}
+                {isManualTrial
+                  ? 'Free Trial Active'
+                  : hasActiveSubscription
+                    ? 'Subscription Active'
+                    : 'No Active Subscription'}
               </Text>
               <Text style={styles.subscriptionStatusSubtitle}>
-                {hasActiveSubscription
-                  ? 'Manage your subscription'
-                  : 'Subscribe to start DCAing'}
+                {isManualTrial
+                  ? `Expires ${manualTrialEnd ? new Date(manualTrialEnd).toLocaleDateString() : 'soon'}`
+                  : hasActiveSubscription
+                    ? 'Manage your subscription'
+                    : 'Subscribe to start DCAing'}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
@@ -1236,6 +1311,9 @@ const createStyles = (colors) => StyleSheet.create({
   subscriptionStatusCardActive: {
     borderColor: colors.success,
   },
+  subscriptionStatusCardTrial: {
+    borderColor: '#64D2FF',
+  },
   subscriptionStatusContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1252,6 +1330,9 @@ const createStyles = (colors) => StyleSheet.create({
   },
   subscriptionStatusTitleActive: {
     color: colors.success,
+  },
+  subscriptionStatusTitleTrial: {
+    color: '#64D2FF',
   },
   subscriptionStatusSubtitle: {
     fontSize: 14,
