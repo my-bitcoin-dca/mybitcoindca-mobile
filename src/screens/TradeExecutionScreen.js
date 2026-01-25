@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { executeMarketBuy, getSelectedExchange, getExchangeInfo } from '../services/exchangeService';
 import { dcaAPI, authAPI } from '../services/api';
@@ -20,9 +21,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
   const userId = user?._id;
   const { tradeData, anomalyData } = route.params || {};
 
-  // If coming from anomaly alert without tradeData, use a default amount
-  const defaultAmount = 100; // Default to 100 currency units
-  const effectiveTradeData = tradeData || { fiatAmount: defaultAmount };
+  const isAnomalyPurchase = !!anomalyData && !tradeData;
 
   const [loading, setLoading] = useState(false);
   const [btcPrice, setBtcPrice] = useState(null);
@@ -31,6 +30,8 @@ export default function TradeExecutionScreen({ route, navigation }) {
   const [tradingFeePercent, setTradingFeePercent] = useState(0.1); // Default 0.1%
   const [currency, setCurrency] = useState(anomalyData?.currency || 'EUR');
   const [exchange, setExchange] = useState('binance');
+  const [fiatAmount, setFiatAmount] = useState(tradeData?.fiatAmount || tradeData?.eurAmount || 100);
+  const [amountInput, setAmountInput] = useState('');
 
   useEffect(() => {
     // Load trading fee and estimate purchase
@@ -55,7 +56,15 @@ export default function TradeExecutionScreen({ route, navigation }) {
       const userCurrency = response.success ? (response.data.settings.currency || 'EUR') : 'EUR';
       setCurrency(userCurrency);
 
-      await estimatePurchase(defaultFee, userCurrency, userExchange);
+      // For anomaly purchases, use the user's DCA amount as the default
+      let amount = tradeData?.fiatAmount || tradeData?.eurAmount || 100;
+      if (isAnomalyPurchase && response.success && response.data.settings.dcaAmount) {
+        amount = response.data.settings.dcaAmount;
+      }
+      setFiatAmount(amount);
+      setAmountInput(amount.toString());
+
+      await estimatePurchase(defaultFee, userCurrency, userExchange, amount);
     } catch (error) {
       console.error('Error loading trading fee:', error);
       // Use defaults - but still try to get selected exchange from local storage
@@ -63,11 +72,11 @@ export default function TradeExecutionScreen({ route, navigation }) {
       setExchange(fallbackExchange);
       const exchangeInfo = getExchangeInfo(fallbackExchange);
       const defaultFee = exchangeInfo?.tradingFee || 0.1;
-      await estimatePurchase(defaultFee, 'EUR', fallbackExchange);
+      await estimatePurchase(defaultFee, 'EUR', fallbackExchange, fiatAmount);
     }
   };
 
-  const estimatePurchase = async (feePercent, userCurrency = 'EUR', userExchange = 'binance') => {
+  const estimatePurchase = async (feePercent, userCurrency = 'EUR', userExchange = 'binance', amount = null) => {
     try {
       let currentPrice;
 
@@ -90,12 +99,12 @@ export default function TradeExecutionScreen({ route, navigation }) {
 
       setBtcPrice(currentPrice);
 
-      // Get fiat amount from effectiveTradeData (supports both old eurAmount and new fiatAmount)
-      const fiatAmount = effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount;
+      // Use provided amount or current fiatAmount state
+      const purchaseAmount = amount ?? fiatAmount;
 
       // Estimate BTC amount
       // Note: Trading fee is automatically deducted by the exchange, this is just an estimate
-      const estimatedAmount = fiatAmount / currentPrice;
+      const estimatedAmount = purchaseAmount / currentPrice;
       setEstimatedBtc(estimatedAmount);
     } catch (error) {
       console.error('Error estimating purchase:', error);
@@ -104,8 +113,27 @@ export default function TradeExecutionScreen({ route, navigation }) {
     }
   };
 
+  const handleAmountChange = (text) => {
+    // Allow only numbers and decimal point
+    const filtered = text.replace(/[^0-9.]/g, '');
+    setAmountInput(filtered);
+
+    const parsed = parseFloat(filtered);
+    if (!isNaN(parsed) && parsed > 0) {
+      setFiatAmount(parsed);
+      // Re-estimate BTC with new amount
+      if (btcPrice) {
+        setEstimatedBtc(parsed / btcPrice);
+      }
+    }
+  };
+
   const handleExecute = async () => {
-    const fiatAmount = effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount;
+    if (!fiatAmount || fiatAmount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
+      return;
+    }
+
     const currencySymbol = getCurrencySymbol(currency);
     const exchangeName = getExchangeInfo(exchange).name;
 
@@ -126,7 +154,6 @@ export default function TradeExecutionScreen({ route, navigation }) {
   const executeTrade = async () => {
     setLoading(true);
     try {
-      const fiatAmount = effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount;
       const result = await executeMarketBuy(exchange, fiatAmount, tradingFeePercent, currency, userId);
 
       if (result.success) {
@@ -249,9 +276,23 @@ export default function TradeExecutionScreen({ route, navigation }) {
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{currency} Amount:</Text>
-            <Text style={styles.infoValue}>
-              {getCurrencySymbol(currency)}{(effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount).toFixed(2)}
-            </Text>
+            {isAnomalyPurchase ? (
+              <View style={styles.amountInputContainer}>
+                <Text style={styles.currencyPrefix}>{getCurrencySymbol(currency)}</Text>
+                <TextInput
+                  style={styles.amountInput}
+                  value={amountInput}
+                  onChangeText={handleAmountChange}
+                  keyboardType="decimal-pad"
+                  placeholder="100"
+                  placeholderTextColor={colors.textTertiary}
+                />
+              </View>
+            ) : (
+              <Text style={styles.infoValue}>
+                {getCurrencySymbol(currency)}{fiatAmount.toFixed(2)}
+              </Text>
+            )}
           </View>
 
           {loadingPrice ? (
@@ -273,7 +314,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabelSmall}>Trading Fee ({tradingFeePercent}%):</Text>
                 <Text style={styles.infoValueSmall}>
-                  ~{getCurrencySymbol(currency)}{((effectiveTradeData.fiatAmount || effectiveTradeData.eurAmount) * (tradingFeePercent / 100)).toFixed(2)}
+                  ~{getCurrencySymbol(currency)}{(fiatAmount * (tradingFeePercent / 100)).toFixed(2)}
                 </Text>
               </View>
             </>
@@ -417,6 +458,29 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 18,
     color: colors.text,
     fontWeight: 'bold',
+  },
+  amountInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+  },
+  currencyPrefix: {
+    fontSize: 18,
+    color: colors.text,
+    fontWeight: 'bold',
+    marginRight: 4,
+  },
+  amountInput: {
+    fontSize: 18,
+    color: colors.text,
+    fontWeight: 'bold',
+    minWidth: 80,
+    paddingVertical: 8,
+    textAlign: 'right',
   },
   infoLabelSmall: {
     fontSize: 14,
