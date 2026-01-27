@@ -90,7 +90,6 @@ export async function executeWithdrawal(address, amount, network = 'BTC', userId
       data: result,
     };
   } catch (error) {
-    console.error('Withdrawal error:', error);
     return {
       success: false,
       error: error.message,
@@ -115,7 +114,6 @@ export async function getAccountBalances(userId) {
       data: accountInfo.balances.filter(b => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0),
     };
   } catch (error) {
-    console.error('Error fetching balances:', error);
     return {
       success: false,
       error: error.message,
@@ -135,7 +133,6 @@ export async function getWithdrawalFee(userId) {
     const fees = await client.withdrawalFee({ coin: 'BTC', useServerTime: true });
     return parseFloat(fees);
   } catch (error) {
-    console.error('Error fetching withdrawal fee:', error);
     // Return a fallback fee if API call fails
     return 0.0005; // Typical BTC network fee
   }
@@ -253,7 +250,6 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
       },
     };
   } catch (error) {
-    console.error('Market buy order error:', error);
     return {
       success: false,
       error: error.message || error.toString(),

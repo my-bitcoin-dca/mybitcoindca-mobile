@@ -1,7 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-import api from './api';
 
 // Configure how notifications should be handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -29,14 +28,12 @@ export async function registerForPushNotifications() {
     }
 
     if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
       return null;
     }
 
     token = (await Notifications.getExpoPushTokenAsync()).data;
-    console.log('Expo Push Token:', token);
   } else {
-    console.log('Must use physical device for Push Notifications');
+    // Push notifications require a physical device
   }
 
   if (Platform.OS === 'android') {
@@ -58,12 +55,9 @@ export async function registerForPushNotifications() {
 export async function sendPushTokenToServer(token) {
   try {
     const { sendPushToken } = await import('./api');
-    const result = await sendPushToken(token);
-    if (result.success) {
-      console.log('Push token sent to server');
-    }
+    await sendPushToken(token);
   } catch (error) {
-    console.error('Failed to send push token to server:', error);
+    // Non-critical - push notifications will still work locally
   }
 }
 
@@ -76,7 +70,6 @@ export async function sendPushTokenToServer(token) {
 export function setupNotificationListeners(onNotificationReceived, onNotificationTapped) {
   // This listener is fired whenever a notification is received while the app is foregrounded
   const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-    console.log('Notification received:', notification);
     if (onNotificationReceived) {
       onNotificationReceived(notification);
     }
@@ -84,7 +77,6 @@ export function setupNotificationListeners(onNotificationReceived, onNotificatio
 
   // This listener is fired whenever a user taps on or interacts with a notification
   const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-    console.log('Notification tapped:', response);
     if (onNotificationTapped) {
       onNotificationTapped(response);
     }

@@ -31,7 +31,6 @@ export const AuthProvider = ({ children }) => {
         }
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
       setIsAuthenticated(false);
     } finally {
       setLoading(false);
@@ -150,7 +149,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await authAPI.logout();
     } catch (error) {
-      console.error('Logout error:', error);
+      // Continue with logout even if server call fails
     } finally {
       await storage.deleteItem('accessToken');
       await storage.deleteItem('disclaimer_accepted');
@@ -171,7 +170,6 @@ export const AuthProvider = ({ children }) => {
       }
       return false;
     } catch (error) {
-      console.error('Passcode verification failed:', error);
       return false;
     }
   };
@@ -181,7 +179,6 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.setPasscode(passcode);
       return response.success;
     } catch (error) {
-      console.error('Failed to set passcode:', error);
       return false;
     }
   };
@@ -191,7 +188,6 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.getPasscodeStatus();
       return response.success && response.data.hasPasscode;
     } catch (error) {
-      console.error('Failed to check passcode status:', error);
       return false;
     }
   };
@@ -233,10 +229,8 @@ export const AuthProvider = ({ children }) => {
       const token = await registerForPushNotifications();
       if (token) {
         await sendPushTokenToServer(token);
-        console.log('[Auth] Push token registered successfully');
       }
     } catch (error) {
-      console.log('[Auth] Push notification registration failed:', error);
       // Don't fail auth if push registration fails
     }
   };
@@ -247,10 +241,8 @@ export const AuthProvider = ({ children }) => {
       const storedCountry = await storage.getItem('user_country');
       if (storedCountry) {
         await authAPI.updateSettings({ country: storedCountry });
-        console.log('[Auth] Country synced to server:', storedCountry);
       }
     } catch (error) {
-      console.log('[Auth] Country sync failed:', error);
       // Don't fail auth if country sync fails
     }
   };
@@ -261,20 +253,16 @@ export const AuthProvider = ({ children }) => {
       // Sync onboarding status
       if (userData.onboardingCompleted) {
         await storage.setItem('onboarding_completed', 'true');
-        console.log('[Auth] Onboarding status synced from server: completed');
       }
       // Sync disclaimer status
       if (userData.disclaimerAccepted) {
         await storage.setItem('disclaimer_accepted', 'true');
-        console.log('[Auth] Disclaimer status synced from server: accepted');
       }
       // Sync country if set on server
       if (userData.settings?.country) {
         await storage.setItem('user_country', userData.settings.country);
-        console.log('[Auth] Country synced from server:', userData.settings.country);
       }
     } catch (error) {
-      console.log('[Auth] Onboarding status sync failed:', error);
       // Don't fail auth if sync fails
     }
   };
@@ -286,9 +274,8 @@ export const AuthProvider = ({ children }) => {
       if (onboardingCompleted !== undefined) updates.onboardingCompleted = onboardingCompleted;
       if (disclaimerAccepted !== undefined) updates.disclaimerAccepted = disclaimerAccepted;
       await authAPI.updateSettings(updates);
-      console.log('[Auth] Onboarding status updated on server:', updates);
     } catch (error) {
-      console.log('[Auth] Failed to update onboarding status:', error);
+      // Non-critical - continue even if server update fails
     }
   };
 

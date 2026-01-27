@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import {
   View,
   Text,
@@ -66,7 +67,6 @@ export default function TradeExecutionScreen({ route, navigation }) {
 
       await estimatePurchase(defaultFee, userCurrency, userExchange, amount);
     } catch (error) {
-      console.error('Error loading trading fee:', error);
       // Use defaults - but still try to get selected exchange from local storage
       const fallbackExchange = await getSelectedExchange(userId);
       setExchange(fallbackExchange);
@@ -107,7 +107,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
       const estimatedAmount = purchaseAmount / currentPrice;
       setEstimatedBtc(estimatedAmount);
     } catch (error) {
-      console.error('Error estimating purchase:', error);
+      // Price estimation failed - will show placeholder values
     } finally {
       setLoadingPrice(false);
     }
@@ -176,7 +176,6 @@ export default function TradeExecutionScreen({ route, navigation }) {
             notificationTimestamp: tradeData?.scheduledTime || null,
           });
         } catch (reportError) {
-          console.error('Failed to report trade to server:', reportError);
           // Continue even if reporting fails - trade was successful
         }
 
@@ -534,3 +533,29 @@ const createStyles = (colors) => StyleSheet.create({
     color: colors.textSecondary,
   },
 });
+
+TradeExecutionScreen.propTypes = {
+  route: PropTypes.shape({
+    params: PropTypes.shape({
+      tradeData: PropTypes.shape({
+        fiatAmount: PropTypes.number,
+        eurAmount: PropTypes.number,
+        scheduledTime: PropTypes.string,
+        userId: PropTypes.string,
+      }),
+      anomalyData: PropTypes.shape({
+        alertId: PropTypes.string,
+        currentPrice: PropTypes.number,
+        confidence: PropTypes.number,
+        successRate: PropTypes.string,
+        expectedReturn: PropTypes.number,
+        priceChange: PropTypes.number,
+        currency: PropTypes.string,
+        userId: PropTypes.string,
+      }),
+    }),
+  }).isRequired,
+  navigation: PropTypes.shape({
+    goBack: PropTypes.func.isRequired,
+  }).isRequired,
+};

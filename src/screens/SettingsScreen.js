@@ -24,6 +24,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '../utils/currency';
 import { COUNTRIES, getAvailableExchanges, getCountryName, getCountryFlag } from '../config/countries';
 import storage from '../utils/storage';
+import { isValidBitcoinAddress, getBitcoinAddressError } from '../utils/bitcoinValidation';
 
 const FREQUENCIES = [
   { label: 'Weekly', value: 'weekly' },
@@ -136,14 +137,12 @@ export default function SettingsScreen({ navigation }) {
       }
 
       if (subscriptionResponse.success) {
-        console.log('[Settings] Subscription status:', JSON.stringify(subscriptionResponse.data, null, 2));
         setHasActiveSubscription(subscriptionResponse.data.hasActiveSubscription || false);
         setIsManualTrial(subscriptionResponse.data.isManualTrial || false);
         setManualTrialEnd(subscriptionResponse.data.manualTrialEnd || null);
         setCanClaimRetentionTrial(subscriptionResponse.data.canClaimRetentionTrial || false);
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
       Alert.alert('Error', 'Failed to load settings');
     } finally {
       setLoading(false);
@@ -156,7 +155,6 @@ export default function SettingsScreen({ navigation }) {
       setSaving(true);
       await authAPI.updateSettings(updates);
     } catch (error) {
-      console.error('Error saving settings:', error);
       Alert.alert('Error', 'Failed to save settings');
     } finally {
       setSaving(false);
@@ -239,60 +237,7 @@ export default function SettingsScreen({ navigation }) {
         await awardsAPI.checkAwards();
       } catch (error) {
         // Silently fail - awards are not critical
-        console.log('Award check failed:', error);
       }
-    }
-  };
-
-  const isValidBitcoinAddress = (address) => {
-    // Allow empty/null address (optional field)
-    if (!address || address.trim() === '') {
-      return true;
-    }
-
-    const trimmedAddress = address.trim();
-
-    // Validate Bitcoin address formats
-    // Legacy addresses (1...)
-    const isLegacy = /^[1][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(trimmedAddress);
-    // P2SH addresses (3...)
-    const isP2SH = /^[3][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(trimmedAddress);
-    // Bech32 SegWit addresses (bc1q...) - lowercase only
-    const isBech32 = /^(bc1q)[a-z0-9]{38,58}$/.test(trimmedAddress);
-    // Taproot addresses (bc1p...) - always 62 characters total
-    const isTaproot = /^(bc1p)[a-z0-9]{58}$/.test(trimmedAddress);
-
-    return isLegacy || isP2SH || isBech32 || isTaproot;
-  };
-
-  const getBitcoinAddressError = (address) => {
-    if (!address || address.trim() === '') {
-      return null;
-    }
-
-    const trimmedAddress = address.trim();
-
-    // Check for whitespace
-    if (address !== trimmedAddress) {
-      return 'Address contains leading or trailing spaces. Please remove them.';
-    }
-
-    // Check if valid
-    if (isValidBitcoinAddress(trimmedAddress)) {
-      return null;
-    }
-
-    // Provide helpful error messages for common mistakes
-    if (trimmedAddress.match(/^bc1[^qp]/i)) {
-      return 'Bech32 addresses should start with "bc1q" (SegWit) or "bc1p" (Taproot)';
-    } else if (trimmedAddress.match(/^[13]/)) {
-      return 'Legacy/P2SH addresses must be 26-35 characters long (no 0, O, I, or l)';
-    } else if (trimmedAddress.match(/^bc1/i) && /[^a-z0-9]/.test(trimmedAddress)) {
-      return 'Bech32 addresses must contain only lowercase letters and numbers';
-    } else if (trimmedAddress.match(/^BC1/)) {
-      return 'Bech32 addresses must be lowercase';
-    } else {
-      return 'Please enter a valid Bitcoin address (starts with 1, 3, bc1q, or bc1p)';
     }
   };
 
@@ -369,7 +314,6 @@ export default function SettingsScreen({ navigation }) {
         Alert.alert('Error', response.message || 'Failed to activate trial');
       }
     } catch (error) {
-      console.error('Error claiming retention trial:', error);
       Alert.alert('Error', 'Failed to activate trial. Please try again.');
     } finally {
       setClaimingTrial(false);
@@ -390,7 +334,6 @@ export default function SettingsScreen({ navigation }) {
         Alert.alert('Error', response.message || 'Failed to delete account');
       }
     } catch (error) {
-      console.error('Error deleting account:', error);
       Alert.alert('Error', 'Failed to delete account. Please try again.');
     } finally {
       setDeletingAccount(false);
@@ -413,7 +356,6 @@ export default function SettingsScreen({ navigation }) {
           Alert.alert('Error', response.message || 'Failed to setup 2FA');
         }
       } catch (error) {
-        console.error('Error setting up 2FA:', error);
         Alert.alert('Error', 'Failed to setup 2FA. Please try again.');
       } finally {
         setTwoFactorLoading(false);
@@ -461,7 +403,6 @@ export default function SettingsScreen({ navigation }) {
         }
       }
     } catch (error) {
-      console.error('Error confirming 2FA:', error);
       Alert.alert('Error', 'Failed to verify code. Please try again.');
     } finally {
       setTwoFactorLoading(false);

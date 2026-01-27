@@ -33,7 +33,7 @@ export default function AwardsScreen() {
         setStats(response.stats);
       }
     } catch (error) {
-      console.error('Error fetching awards:', error);
+      // Failed to fetch awards - will show empty state
     } finally {
       setLoading(false);
       setRefreshing(false);

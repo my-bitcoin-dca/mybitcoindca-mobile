@@ -19,7 +19,7 @@ export const ThemeProvider = ({ children }) => {
         setIsDarkMode(savedTheme === 'dark');
       }
     } catch (error) {
-      console.error('Error loading theme preference:', error);
+      // Use default theme
     } finally {
       setIsLoading(false);
     }
@@ -31,7 +31,7 @@ export const ThemeProvider = ({ children }) => {
       setIsDarkMode(newTheme);
       await AsyncStorage.setItem('theme', newTheme ? 'dark' : 'light');
     } catch (error) {
-      console.error('Error saving theme preference:', error);
+      // Theme will revert on next app load
     }
   };
 

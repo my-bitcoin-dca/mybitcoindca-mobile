@@ -62,7 +62,7 @@ export default function TransactionsScreen() {
         }
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      // Failed to fetch transactions - will show empty state
     } finally {
       setLoading(false);
     }

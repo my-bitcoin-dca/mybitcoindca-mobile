@@ -67,7 +67,6 @@ async function refreshAccessToken() {
     }
     return false;
   } catch (error) {
-    console.error('Failed to refresh token:', error);
     return false;
   }
 }
@@ -78,7 +77,6 @@ export async function sendPushToken(token) {
     const response = await api.post('/auth/push-token', { token });
     return response.data;
   } catch (error) {
-    console.error('Failed to send push token:', error);
     return { success: false, error: error.message };
   }
 }

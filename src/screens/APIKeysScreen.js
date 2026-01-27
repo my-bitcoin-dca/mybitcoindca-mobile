@@ -66,27 +66,22 @@ export default function APIKeysScreen({ navigation }) {
 
       // Load country from local storage
       const countryCode = await storage.getItem('user_country');
-      console.log('[APIKeys] Loaded country code:', countryCode);
       setUserCountry(countryCode || '');
 
       // Get available exchanges based on country
       const filteredExchanges = getExchangesForCountry(countryCode);
-      console.log('[APIKeys] Filtered exchanges for country:', filteredExchanges.map(e => e.id));
       setAvailableExchanges(filteredExchanges);
 
       // Load from server settings
       const response = await authAPI.getSettings();
-      console.log('[APIKeys] Server settings response:', JSON.stringify(response.data?.settings, null, 2));
       if (response.success && response.data?.settings?.exchange) {
         const serverExchange = response.data.settings.exchange;
         // Check if the server exchange is available in user's country
         const isAvailable = filteredExchanges.some(e => e.id === serverExchange);
         if (isAvailable) {
-          console.log('[APIKeys] Using server exchange:', serverExchange);
           setSelectedExchangeId(serverExchange);
         } else if (filteredExchanges.length > 0) {
           // Default to first available exchange
-          console.log('[APIKeys] Server exchange not available, using:', filteredExchanges[0].id);
           setSelectedExchangeId(filteredExchanges[0].id);
         }
       } else {
@@ -94,17 +89,13 @@ export default function APIKeysScreen({ navigation }) {
         const stored = await getSelectedExchange(userId);
         const isAvailable = filteredExchanges.some(e => e.id === stored);
         if (isAvailable) {
-          console.log('[APIKeys] Falling back to local storage:', stored);
           setSelectedExchangeId(stored);
         } else if (filteredExchanges.length > 0) {
-          console.log('[APIKeys] Stored exchange not available, using:', filteredExchanges[0].id);
           setSelectedExchangeId(filteredExchanges[0].id);
         }
       }
     } catch (error) {
-      console.error('Error loading exchange settings:', error);
       const stored = await getSelectedExchange(userId);
-      console.log('[APIKeys] Error fallback to local storage:', stored);
       setSelectedExchangeId(stored);
     } finally {
       setInitialLoading(false);
@@ -117,17 +108,14 @@ export default function APIKeysScreen({ navigation }) {
   };
 
   const handleExchangeChange = async (exchangeId) => {
-    console.log('[APIKeys] Changing exchange to:', exchangeId);
     setSelectedExchangeId(exchangeId);
     await setSelectedExchange(exchangeId, userId);
-    console.log('[APIKeys] Saved to local storage');
 
     // Save to server
     try {
       await authAPI.updateSettings({ exchange: exchangeId });
-      console.log('[APIKeys] Saved to server');
     } catch (error) {
-      console.error('[APIKeys] Error saving exchange setting:', error);
+      // Silently fail - local storage is primary
     }
 
     // Clear input fields when switching exchanges

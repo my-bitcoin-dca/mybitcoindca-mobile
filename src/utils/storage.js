@@ -17,7 +17,6 @@ export const storage = {
         return await SecureStore.getItemAsync(key);
       }
     } catch (error) {
-      console.error(`Error getting item ${key}:`, error);
       return null;
     }
   },
@@ -30,7 +29,6 @@ export const storage = {
         await SecureStore.setItemAsync(key, value);
       }
     } catch (error) {
-      console.error(`Error setting item ${key}:`, error);
       throw error;
     }
   },
@@ -43,7 +41,6 @@ export const storage = {
         await SecureStore.deleteItemAsync(key);
       }
     } catch (error) {
-      console.error(`Error deleting item ${key}:`, error);
       throw error;
     }
   },

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import {
   View,
   Text,
@@ -61,7 +62,6 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
       // Now fetch network fee with the correct exchange
       await fetchNetworkFee(selectedExchange);
     } catch (error) {
-      console.error('Error loading exchange info:', error);
       await fetchNetworkFee('binance');
     }
   };
@@ -73,7 +73,7 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
         setTwoFactorEnabled(response.data.enabled);
       }
     } catch (error) {
-      console.error('Error fetching 2FA status:', error);
+      // 2FA status check failed - assume disabled
     }
   };
 
@@ -86,7 +86,7 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
         setManualMode(!appWithdrawal);
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      // Use default settings
     } finally {
       setLoadingSettings(false);
     }
@@ -97,7 +97,6 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
       const fee = await getWithdrawalFee(exchangeId, userId);
       setNetworkFee(fee);
     } catch (error) {
-      console.error('Error fetching fee:', error);
       setNetworkFee(0.0005); // Fallback
     } finally {
       setLoadingFee(false);
@@ -155,7 +154,6 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
         Alert.alert('Error', response.message || 'Invalid verification code.');
       }
     } catch (error) {
-      console.error('Error verifying 2FA:', error);
       Alert.alert('Error', 'Failed to verify code. Please try again.');
     } finally {
       setVerifying2FA(false);
@@ -190,7 +188,6 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
             timestamp: new Date().toISOString(),
           });
         } catch (reportError) {
-          console.error('Failed to report withdrawal to server:', reportError);
           // Continue even if reporting fails - withdrawal was successful
         }
 
@@ -273,7 +270,6 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
         ]
       );
     } catch (error) {
-      console.error('Failed to report manual withdrawal:', error);
       // Still allow user to proceed even if reporting fails
       Alert.alert(
         'Withdrawal Initiated',
@@ -877,3 +873,21 @@ const createStyles = (colors) => StyleSheet.create({
     opacity: 0.6,
   },
 });
+
+WithdrawalApprovalScreen.propTypes = {
+  route: PropTypes.shape({
+    params: PropTypes.shape({
+      withdrawalData: PropTypes.shape({
+        eurAmount: PropTypes.number,
+        btcAmount: PropTypes.number.isRequired,
+        address: PropTypes.string.isRequired,
+        requestId: PropTypes.string,
+        appWithdrawal: PropTypes.bool,
+        userId: PropTypes.string,
+      }).isRequired,
+    }).isRequired,
+  }).isRequired,
+  navigation: PropTypes.shape({
+    goBack: PropTypes.func.isRequired,
+  }).isRequired,
+};

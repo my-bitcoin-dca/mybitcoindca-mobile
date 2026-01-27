@@ -141,7 +141,6 @@ export async function getAccountBalances(userId) {
       data: balanceArray,
     };
   } catch (error) {
-    console.error('Error fetching Kraken balances:', error);
     return {
       success: false,
       error: error.message,
@@ -163,7 +162,6 @@ export async function getWithdrawalFee(userId) {
     }, userId);
     return parseFloat(fees.fee);
   } catch (error) {
-    console.error('Error fetching Kraken withdrawal fee:', error);
     // Return a fallback fee if API call fails
     return 0.0005; // Typical BTC network fee
   }
@@ -195,7 +193,6 @@ export async function executeWithdrawal(address, amount, userId) {
       },
     };
   } catch (error) {
-    console.error('Kraken withdrawal error:', error);
     return {
       success: false,
       error: error.message,
@@ -291,7 +288,6 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.26, cur
     } catch (queryError) {
       // ClosedOrders query failed (likely missing permissions)
       // The order was still placed successfully, so use fallback calculation
-      console.warn('Could not query order details:', queryError.message);
       totalBtc = parseFloat(quantity);
       totalFiat = fiatAmount;
       totalFees = fiatAmount * (tradingFeePercent / 100);
@@ -316,7 +312,6 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.26, cur
       },
     };
   } catch (error) {
-    console.error('Kraken market buy order error:', error);
     return {
       success: false,
       error: error.message || error.toString(),

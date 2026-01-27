@@ -52,7 +52,6 @@ export default function RegisterScreen({ navigation }) {
         Alert.alert('Google Sign-Up Failed', 'No ID token received');
       }
     } catch (error) {
-      console.log('Google Sign-In Error:', error.code, error.message);
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         // User cancelled
       } else if (error.code === statusCodes.IN_PROGRESS) {

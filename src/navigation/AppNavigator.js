@@ -1,4 +1,5 @@
 import React, { useEffect, useState, forwardRef } from 'react';
+import PropTypes from 'prop-types';
 import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -80,7 +81,6 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
         setDisclaimerAccepted(disclaimer === 'true');
       }
     } catch (error) {
-      console.error('Error checking status:', error);
       setOnboardingCompleted(false);
       setDisclaimerAccepted(false);
     } finally {
@@ -112,7 +112,6 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
 
       // If notification has a userId and it doesn't match current user, wait for correct user
       if (notificationUserId && user?._id && notificationUserId !== user._id) {
-        console.log('[AppNavigator] Notification is for different user, keeping pending');
         return;
       }
 
@@ -358,5 +357,18 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
     </NavigationContainer>
   );
 });
+
+AppNavigator.propTypes = {
+  pendingNotification: PropTypes.shape({
+    screen: PropTypes.string.isRequired,
+    params: PropTypes.object,
+  }),
+  onNotificationHandled: PropTypes.func,
+};
+
+AppNavigator.defaultProps = {
+  pendingNotification: null,
+  onNotificationHandled: null,
+};
 
 export default AppNavigator;

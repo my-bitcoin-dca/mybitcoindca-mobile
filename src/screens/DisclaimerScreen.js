@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import {
   View,
   Text,
@@ -33,7 +34,7 @@ export default function DisclaimerScreen({ onAccept }) {
       await storage.setItem('disclaimer_accepted', 'true');
       onAccept();
     } catch (error) {
-      console.error('Error saving disclaimer acceptance:', error);
+      // Acceptance save failed - user can retry
     } finally {
       setLoading(false);
     }
@@ -318,3 +319,7 @@ const createStyles = (colors) => StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+DisclaimerScreen.propTypes = {
+  onAccept: PropTypes.func.isRequired,
+};
