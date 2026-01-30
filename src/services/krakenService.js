@@ -62,6 +62,14 @@ async function krakenRequest(endpoint, params = {}, userId = null) {
     body: postData,
   });
 
+  // Check if response is JSON before parsing
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('Kraken API returned non-JSON response:', text.substring(0, 200));
+    throw new Error(`Kraken API error: ${response.status} - received non-JSON response. Please try again.`);
+  }
+
   const data = await response.json();
 
   if (data.error && data.error.length > 0) {
@@ -79,6 +87,15 @@ async function krakenPublicRequest(endpoint, params = {}) {
   const url = `${KRAKEN_API_URL}/0/public/${endpoint}${queryString ? '?' + queryString : ''}`;
 
   const response = await fetch(url);
+
+  // Check if response is JSON before parsing
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('Kraken API returned non-JSON response:', text.substring(0, 200));
+    throw new Error(`Kraken API error: ${response.status} - received non-JSON response. Please try again.`);
+  }
+
   const data = await response.json();
 
   if (data.error && data.error.length > 0) {

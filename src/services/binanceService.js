@@ -1,6 +1,65 @@
 import Binance from 'binance-api-react-native';
+import CryptoJS from 'crypto-js';
 import storage from '../utils/storage';
 import { getBinancePair } from '../utils/currency';
+
+const BINANCE_API_URL = 'https://api.binance.com';
+
+/**
+ * Make a signed request to Binance SAPI (new API endpoints)
+ * The library uses deprecated WAPI endpoints, so we need to make direct calls for some functions
+ */
+async function binanceSapiRequest(endpoint, params = {}, method = 'POST', userId) {
+  const apiKey = await storage.getItem(getStorageKey('binance_api_key', userId));
+  const apiSecret = await storage.getItem(getStorageKey('binance_api_secret', userId));
+
+  if (!apiKey || !apiSecret) {
+    throw new Error('Binance API keys not found. Please configure them first.');
+  }
+
+  // Add timestamp and recvWindow
+  const timestamp = Date.now();
+  const queryParams = {
+    ...params,
+    timestamp,
+    recvWindow: 60000,
+  };
+
+  // Create query string
+  const queryString = Object.keys(queryParams)
+    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(queryParams[key])}`)
+    .join('&');
+
+  // Generate signature
+  const signature = CryptoJS.HmacSHA256(queryString, apiSecret).toString(CryptoJS.enc.Hex);
+  const signedQueryString = `${queryString}&signature=${signature}`;
+
+  const url = `${BINANCE_API_URL}${endpoint}?${signedQueryString}`;
+
+  const response = await fetch(url, {
+    method,
+    headers: {
+      'X-MBX-APIKEY': apiKey,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  });
+
+  // Check if response is JSON
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('Binance API returned non-JSON response:', text.substring(0, 200));
+    throw new Error(`Binance API error: ${response.status} - received non-JSON response. Please try again.`);
+  }
+
+  const data = await response.json();
+
+  if (data.code && data.code < 0) {
+    throw new Error(data.msg || `Binance error code: ${data.code}`);
+  }
+
+  return data;
+}
 
 /**
  * Get storage key with optional user namespace
@@ -67,6 +126,10 @@ export async function deleteBinanceKeys(userId) {
  * This executes directly from the phone to Binance
  * Server never sees the API keys
  *
+ * NOTE: Uses direct SAPI call instead of the library's deprecated WAPI endpoint
+ * The binance-api-react-native library uses /wapi/v3/withdraw.html which is deprecated
+ * New endpoint: /sapi/v1/capital/withdraw/apply
+ *
  * @param {string} address - Bitcoin withdrawal address
  * @param {number} amount - Amount in BTC to withdraw
  * @param {string} network - Network (default: BTC)
@@ -74,25 +137,29 @@ export async function deleteBinanceKeys(userId) {
  * @returns {Promise<Object>} Withdrawal result
  */
 export async function executeWithdrawal(address, amount, network = 'BTC', userId) {
-  const client = await getBinanceClient(userId);
-
   try {
-    const result = await client.withdraw({
-      coin: 'BTC',
-      network: network,
-      address: address,
-      amount: amount,
-      useServerTime: true,
-    });
+    // Use new SAPI endpoint directly (library uses deprecated WAPI)
+    const result = await binanceSapiRequest(
+      '/sapi/v1/capital/withdraw/apply',
+      {
+        coin: 'BTC',
+        network: network,
+        address: address,
+        amount: amount,
+      },
+      'POST',
+      userId
+    );
 
     return {
       success: true,
       data: result,
     };
   } catch (error) {
+    const errorMsg = error.message || error.toString();
     return {
       success: false,
-      error: error.message,
+      error: errorMsg,
     };
   }
 }
@@ -114,25 +181,53 @@ export async function getAccountBalances(userId) {
       data: accountInfo.balances.filter(b => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0),
     };
   } catch (error) {
+    // Check for JSON parse error (HTML response from Binance)
+    const errorMsg = error.message || error.toString();
+    if (errorMsg.includes('JSON') || errorMsg.includes('unexpected character') || errorMsg.includes('Unexpected token')) {
+      return {
+        success: false,
+        error: 'Binance API is temporarily unavailable. This may be due to: geographic restrictions, rate limiting, or Cloudflare protection. Please try again in a few minutes.',
+      };
+    }
     return {
       success: false,
-      error: error.message,
+      error: errorMsg,
     };
   }
 }
 
 /**
  * Get withdrawal fee for BTC
+ * Uses new SAPI endpoint: /sapi/v1/capital/config/getall
  * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<number>} Network fee
  */
 export async function getWithdrawalFee(userId) {
-  const client = await getBinanceClient(userId);
-
   try {
-    const fees = await client.withdrawalFee({ coin: 'BTC', useServerTime: true });
-    return parseFloat(fees);
+    // Use new SAPI endpoint to get coin info including withdrawal fees
+    const coins = await binanceSapiRequest(
+      '/sapi/v1/capital/config/getall',
+      {},
+      'GET',
+      userId
+    );
+
+    // Find BTC in the response
+    const btcInfo = coins.find(c => c.coin === 'BTC');
+    if (btcInfo && btcInfo.networkList) {
+      // Find the BTC network (not Lightning or other L2)
+      const btcNetwork = btcInfo.networkList.find(n => n.network === 'BTC');
+      if (btcNetwork && btcNetwork.withdrawFee) {
+        return parseFloat(btcNetwork.withdrawFee);
+      }
+    }
+
+    // Fallback if parsing fails
+    return 0.0005;
   } catch (error) {
+    // Log error for debugging but return fallback fee
+    const errorMsg = error.message || error.toString();
+    console.warn('Failed to fetch withdrawal fee from Binance:', errorMsg);
     // Return a fallback fee if API call fails
     return 0.0005; // Typical BTC network fee
   }
@@ -250,9 +345,17 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
       },
     };
   } catch (error) {
+    // Check for JSON parse error (HTML response from Binance)
+    const errorMsg = error.message || error.toString();
+    if (errorMsg.includes('JSON') || errorMsg.includes('unexpected character') || errorMsg.includes('Unexpected token')) {
+      return {
+        success: false,
+        error: 'Binance API is temporarily unavailable. This may be due to: geographic restrictions, rate limiting, or Cloudflare protection. Please try again in a few minutes.',
+      };
+    }
     return {
       success: false,
-      error: error.message || error.toString(),
+      error: errorMsg,
     };
   }
 }
