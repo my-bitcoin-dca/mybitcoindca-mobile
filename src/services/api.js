@@ -267,6 +267,11 @@ export const dcaAPI = {
     const response = await api.post('/report-trade-execution', tradeData);
     return response.data;
   },
+
+  skipWithdrawal: async () => {
+    const response = await api.post('/skip-withdrawal');
+    return response.data;
+  },
 };
 
 // Awards API calls

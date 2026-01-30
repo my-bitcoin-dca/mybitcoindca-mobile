@@ -16,6 +16,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { executeWithdrawal, getWithdrawalFee, getSelectedExchange, getExchangeInfo } from '../services/exchangeService';
 import { dcaAPI, authAPI } from '../services/api';
+
+const skipWithdrawalNotifications = async () => {
+  try {
+    await dcaAPI.skipWithdrawal();
+  } catch (error) {
+    // Continue even if skip fails - user should still be able to dismiss
+    console.log('Failed to skip withdrawal notifications:', error);
+  }
+};
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -213,15 +222,15 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
 
   const handleReject = () => {
     Alert.alert(
-      'Reject Withdrawal',
-      'Are you sure you want to reject this withdrawal?',
+      'Skip Withdrawal',
+      'Are you sure you want to skip this withdrawal? You won\'t receive notifications until the next withdrawal window.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Reject',
+          text: 'Skip',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Rejected', 'Withdrawal has been rejected');
+          onPress: async () => {
+            await skipWithdrawalNotifications();
             navigation.goBack();
           },
         },
@@ -457,9 +466,12 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
           <>
             <TouchableOpacity
               style={[styles.button, styles.rejectButton]}
-              onPress={() => navigation.goBack()}
+              onPress={async () => {
+                await skipWithdrawalNotifications();
+                navigation.goBack();
+              }}
             >
-              <Text style={styles.rejectButtonText}>Cancel</Text>
+              <Text style={styles.rejectButtonText}>Skip</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -481,7 +493,7 @@ export default function WithdrawalApprovalScreen({ route, navigation }) {
               onPress={handleReject}
               disabled={loading}
             >
-              <Text style={styles.rejectButtonText}>Reject</Text>
+              <Text style={styles.rejectButtonText}>Skip</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
