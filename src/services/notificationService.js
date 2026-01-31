@@ -150,6 +150,7 @@ export function parseAnomalyAlertNotification(notification) {
       successRate: data.successRate,
       expectedReturn: data.expectedReturn,
       priceChange: data.priceChange,
+      priceChangeTimeframe: data.priceChangeTimeframe || 'today',
       currency: data.currency,
       userId: data.userId,
     };

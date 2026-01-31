@@ -241,7 +241,7 @@ export default function TradeExecutionScreen({ route, navigation }) {
             </View>
 
             <Text style={styles.opportunityTitle}>
-              Bitcoin {anomalyData.priceChange > 0 ? 'Surged' : 'Dropped'} {Math.abs(anomalyData.priceChange).toFixed(1)}%
+              Bitcoin {anomalyData.priceChange > 0 ? 'Surged' : 'Dropped'} {Math.abs(anomalyData.priceChange).toFixed(1)}% {anomalyData.priceChangeTimeframe || 'today'}
             </Text>
 
             <View style={styles.metricsContainer}>
@@ -550,6 +550,7 @@ TradeExecutionScreen.propTypes = {
         successRate: PropTypes.string,
         expectedReturn: PropTypes.number,
         priceChange: PropTypes.number,
+        priceChangeTimeframe: PropTypes.string,
         currency: PropTypes.string,
         userId: PropTypes.string,
       }),
