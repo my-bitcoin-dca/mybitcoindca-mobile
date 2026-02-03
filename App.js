@@ -128,7 +128,7 @@ export default function App() {
           if (anomalyData) {
             Alert.alert(
               'Buying Opportunity Detected',
-              `Bitcoin ${anomalyData.priceChange > 0 ? 'surged' : 'dropped'} ${Math.abs(anomalyData.priceChange).toFixed(1)}%! ${anomalyData.successRate} of similar events led to gains.`,
+              `Bitcoin dropped ${Math.abs(anomalyData.priceChange).toFixed(1)}%! ${anomalyData.successRate} of similar events led to gains.`,
               [
                 {
                   text: 'Buy Now',
