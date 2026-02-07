@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,16 +13,39 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { hasExchangeKeys, getSelectedExchange } from '../services/exchangeService';
 import { useFocusEffect } from '@react-navigation/native';
+import { surveyAPI } from '../services/api';
+import SurveyModal from '../components/SurveyModal';
 
 export default function HomeScreen({ navigation }) {
   const { user, logout } = useAuth();
   const { colors } = useTheme();
   const [hasKeys, setHasKeys] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showSurvey, setShowSurvey] = useState(false);
+  const surveyChecked = useRef(false);
 
   useEffect(() => {
     checkSetup();
+    checkSurvey();
   }, []);
+
+  const checkSurvey = async () => {
+    // Only check once per session
+    if (surveyChecked.current) return;
+    surveyChecked.current = true;
+
+    try {
+      const response = await surveyAPI.shouldShow();
+      if (response.success && response.showSurvey) {
+        // Show survey after a short delay to let the screen load
+        setTimeout(() => {
+          setShowSurvey(true);
+        }, 2000);
+      }
+    } catch (error) {
+      console.log('[Survey] Error checking:', error);
+    }
+  };
 
   // Re-check setup when screen comes into focus
   useFocusEffect(
@@ -55,9 +78,14 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
+  const handleCloseSurvey = () => {
+    setShowSurvey(false);
+  };
+
   const styles = createStyles(colors);
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       refreshControl={
@@ -132,6 +160,9 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
     </ScrollView>
+
+    <SurveyModal visible={showSurvey} onClose={handleCloseSurvey} />
+    </>
   );
 }
 

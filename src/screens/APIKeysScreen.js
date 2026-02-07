@@ -150,6 +150,15 @@ export default function APIKeysScreen({ navigation }) {
       const result = await getAccountBalances(selectedExchangeId, userId);
       if (result.success) {
         const exchangeName = getExchangeInfo(selectedExchangeId).name;
+
+        // Report successful connection to server (for tracking purposes)
+        try {
+          await authAPI.reportApiKeysConnected(selectedExchangeId);
+        } catch (reportError) {
+          // Silently fail - this is just for analytics
+          console.log('[APIKeys] Failed to report connection:', reportError);
+        }
+
         Alert.alert(
           'Success',
           `API keys are valid! Connected to ${exchangeName} successfully.`,

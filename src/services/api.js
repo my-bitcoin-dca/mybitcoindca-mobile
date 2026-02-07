@@ -239,6 +239,12 @@ export const authAPI = {
     const response = await api.post('/subscription/claim-retention-trial');
     return response.data;
   },
+
+  // Exchange connection tracking
+  reportApiKeysConnected: async (exchange) => {
+    const response = await api.post('/report-api-keys-connected', { exchange });
+    return response.data;
+  },
 };
 
 // DCA API calls
@@ -298,6 +304,24 @@ export const awardsAPI = {
 
   markNotified: async (awardId) => {
     const response = await api.post(`/awards/${awardId}/notified`);
+    return response.data;
+  },
+};
+
+// Survey API calls
+export const surveyAPI = {
+  shouldShow: async () => {
+    const response = await api.get('/survey/should-show');
+    return response.data;
+  },
+
+  submit: async (reason, feedback) => {
+    const response = await api.post('/survey/submit', { reason, feedback });
+    return response.data;
+  },
+
+  dismiss: async () => {
+    const response = await api.post('/survey/dismiss');
     return response.data;
   },
 };
