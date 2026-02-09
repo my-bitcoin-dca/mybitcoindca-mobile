@@ -2,6 +2,7 @@
   "expo": {
     "name": "My Bitcoin DCA",
     "slug": "mobile",
+    "scheme": "mybitcoindca",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -52,7 +53,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.137138637634-ts4o3fbeb41mc00bbkjnh61r9jnuluum"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

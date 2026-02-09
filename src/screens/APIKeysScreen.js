@@ -228,7 +228,7 @@ export default function APIKeysScreen({ navigation }) {
             </Text>
           </View>
         ) : (
-          <View style={styles.exchangeButtons}>
+          <View style={styles.exchangeButtonsContainer}>
             {availableExchanges.map((exchange) => (
               <TouchableOpacity
                 key={exchange.id}
@@ -238,14 +238,16 @@ export default function APIKeysScreen({ navigation }) {
                 ]}
                 onPress={() => handleExchangeChange(exchange.id)}
               >
-                <Text
-                  style={[
-                    styles.exchangeButtonText,
-                    selectedExchangeId === exchange.id && styles.exchangeButtonTextActive,
-                  ]}
-                >
-                  {exchange.name}
-                </Text>
+                <View style={styles.exchangeButtonHeader}>
+                  <Text
+                    style={[
+                      styles.exchangeButtonText,
+                      selectedExchangeId === exchange.id && styles.exchangeButtonTextActive,
+                    ]}
+                  >
+                    {exchange.name}
+                  </Text>
+                </View>
                 <Text
                   style={[
                     styles.exchangeButtonDesc,
@@ -253,6 +255,14 @@ export default function APIKeysScreen({ navigation }) {
                   ]}
                 >
                   {exchange.description}
+                </Text>
+                <Text
+                  style={[
+                    styles.exchangeButtonFee,
+                    selectedExchangeId === exchange.id && styles.exchangeButtonFeeActive,
+                  ]}
+                >
+                  {exchange.tradingFee}% fee
                 </Text>
               </TouchableOpacity>
             ))}
@@ -302,7 +312,9 @@ export default function APIKeysScreen({ navigation }) {
         <View style={styles.card}>
           <View style={styles.statusContainer}>
             <View style={styles.statusDot} />
-            <Text style={styles.statusText}>{exchangeInfo.name} API Keys Configured</Text>
+            <Text style={styles.statusText}>
+              {exchangeInfo.name} API Keys Configured
+            </Text>
           </View>
 
           <TouchableOpacity
@@ -325,14 +337,19 @@ export default function APIKeysScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       ) : (
+        // API key flow for Binance, Kraken, Coinbase
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Enter Your {exchangeInfo.name} API Keys</Text>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>API Key</Text>
+            <Text style={styles.label}>
+              {selectedExchangeId === 'coinbase_advanced' ? 'API Key Name' : 'API Key'}
+            </Text>
             <TextInput
               style={styles.input}
-              placeholder={`Enter your ${exchangeInfo.name} API key`}
+              placeholder={selectedExchangeId === 'coinbase_advanced'
+                ? 'organizations/xxx/apiKeys/xxx'
+                : `Enter your ${exchangeInfo.name} API key`}
               placeholderTextColor={colors.textTertiary}
               value={apiKey}
               onChangeText={setApiKey}
@@ -344,17 +361,21 @@ export default function APIKeysScreen({ navigation }) {
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>
-              {selectedExchangeId === 'kraken' ? 'Private Key' : 'API Secret'}
+              {selectedExchangeId === 'kraken' || selectedExchangeId === 'coinbase_advanced' ? 'Private Key' : 'API Secret'}
             </Text>
             <TextInput
-              style={styles.input}
-              placeholder={`Enter your ${exchangeInfo.name} ${selectedExchangeId === 'kraken' ? 'private key' : 'API secret'}`}
+              style={[styles.input, selectedExchangeId === 'coinbase_advanced' && styles.multilineInput]}
+              placeholder={selectedExchangeId === 'coinbase_advanced'
+                ? '-----BEGIN EC PRIVATE KEY-----...'
+                : `Enter your ${exchangeInfo.name} ${selectedExchangeId === 'kraken' ? 'private key' : 'API secret'}`}
               placeholderTextColor={colors.textTertiary}
               value={apiSecret}
               onChangeText={setApiSecret}
               autoCapitalize="none"
               autoCorrect={false}
               secureTextEntry={!showSecrets}
+              multiline={selectedExchangeId === 'coinbase_advanced'}
+              numberOfLines={selectedExchangeId === 'coinbase_advanced' ? 4 : 1}
             />
           </View>
 
@@ -487,8 +508,9 @@ const createStyles = (colors) => StyleSheet.create({
     padding: 20,
     paddingBottom: 0,
   },
-  exchangeButtons: {
+  exchangeButtonsContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
   noExchangesCard: {
@@ -507,7 +529,7 @@ const createStyles = (colors) => StyleSheet.create({
     lineHeight: 20,
   },
   exchangeButton: {
-    flex: 1,
+    width: '48%',
     padding: 16,
     borderRadius: 12,
     borderWidth: 2,
@@ -518,21 +540,46 @@ const createStyles = (colors) => StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primary + '10',
   },
+  exchangeButtonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   exchangeButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 4,
   },
   exchangeButtonTextActive: {
     color: colors.primary,
   },
   exchangeButtonDesc: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textSecondary,
+    marginBottom: 4,
   },
   exchangeButtonDescActive: {
     color: colors.primary,
+  },
+  exchangeButtonFee: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    fontWeight: '500',
+  },
+  exchangeButtonFeeActive: {
+    color: colors.primary,
+  },
+  oauthBadge: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: '#0052FF',
+    borderRadius: 4,
+  },
+  oauthBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#fff',
   },
   infoCard: {
     backgroundColor: '#E3F2FD',
@@ -628,6 +675,10 @@ const createStyles = (colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     color: colors.text,
+  },
+  multilineInput: {
+    minHeight: 100,
+    textAlignVertical: 'top',
   },
   showButton: {
     alignSelf: 'flex-end',
@@ -770,5 +821,39 @@ const createStyles = (colors) => StyleSheet.create({
   linkSubtitle: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  oauthDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  oauthButton: {
+    backgroundColor: '#0052FF', // Coinbase blue
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  oauthButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  oauthPermissions: {
+    marginTop: 20,
+    padding: 12,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+  },
+  oauthPermissionsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  oauthPermissionsText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 4,
   },
 });
