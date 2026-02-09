@@ -13,6 +13,7 @@ import {
   Linking,
   Modal,
   SafeAreaView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
@@ -1114,7 +1115,14 @@ export default function SettingsScreen({ navigation }) {
         onRequestClose={() => setShowDeleteReasonModal(false)}
       >
         <SafeAreaView style={styles.modalFullScreen}>
-          <ScrollView contentContainerStyle={styles.modalFullScreenContent}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+          >
+            <ScrollView
+              contentContainerStyle={styles.modalFullScreenContent}
+              keyboardShouldPersistTaps="handled"
+            >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>We're sorry to see you go</Text>
               <TouchableOpacity
@@ -1191,7 +1199,8 @@ export default function SettingsScreen({ navigation }) {
                 )}
               </TouchableOpacity>
             </View>
-          </ScrollView>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
     </ScrollView>
