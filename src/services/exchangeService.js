@@ -1,12 +1,10 @@
 /**
  * Exchange Service Factory
- * Provides a unified interface for interacting with different exchanges (Binance, Kraken, Coinbase)
+ * Provides a unified interface for interacting with different exchanges (Binance, Kraken)
  */
 
 import * as binanceService from './binanceService';
 import * as krakenService from './krakenService';
-import * as coinbaseAdvancedService from './coinbaseAdvancedService';
-import * as coinbaseService from './coinbaseService';
 import storage from '../utils/storage';
 import { getAvailableExchanges as getCountryExchanges } from '../config/countries';
 
@@ -27,14 +25,6 @@ const ALL_EXCHANGES = [
     tradingFee: 0.26, // 0.26% taker fee
     website: 'https://www.kraken.com',
     apiDocsUrl: 'https://www.kraken.com/u/security/api',
-  },
-  {
-    id: 'coinbase_advanced',
-    name: 'Coinbase',
-    description: 'Coinbase with Advanced Trade API',
-    tradingFee: 0.6, // 0.6% taker fee
-    website: 'https://www.coinbase.com/advanced-trade',
-    apiDocsUrl: 'https://www.coinbase.com/settings/api',
   },
 ];
 
@@ -117,10 +107,6 @@ function getService(exchangeId) {
   switch (exchangeId) {
     case 'kraken':
       return krakenService;
-    case 'coinbase_advanced':
-      return coinbaseAdvancedService;
-    case 'coinbase':
-      return coinbaseService;
     case 'binance':
     default:
       return binanceService;
@@ -138,11 +124,6 @@ export async function storeExchangeKeys(exchangeId, apiKey, apiSecret, userId) {
   const service = getService(exchangeId);
   if (exchangeId === 'kraken') {
     await service.storeKrakenKeys(apiKey, apiSecret, userId);
-  } else if (exchangeId === 'coinbase_advanced') {
-    await service.storeCoinbaseAdvancedKeys(apiKey, apiSecret, userId);
-  } else if (exchangeId === 'coinbase') {
-    // OAuth-based, no API keys to store - handled via OAuth flow
-    throw new Error('Coinbase uses OAuth authentication. Use initiateCoinbaseOAuth() instead.');
   } else {
     await service.storeBinanceKeys(apiKey, apiSecret, userId);
   }
@@ -157,10 +138,6 @@ export async function hasExchangeKeys(exchangeId, userId) {
   const service = getService(exchangeId);
   if (exchangeId === 'kraken') {
     return await service.hasKrakenKeys(userId);
-  } else if (exchangeId === 'coinbase_advanced') {
-    return await service.hasCoinbaseAdvancedKeys(userId);
-  } else if (exchangeId === 'coinbase') {
-    return await service.hasCoinbaseKeys(userId);
   } else {
     return await service.hasBinanceKeys(userId);
   }
@@ -175,10 +152,6 @@ export async function deleteExchangeKeys(exchangeId, userId) {
   const service = getService(exchangeId);
   if (exchangeId === 'kraken') {
     await service.deleteKrakenKeys(userId);
-  } else if (exchangeId === 'coinbase_advanced') {
-    await service.deleteCoinbaseAdvancedKeys(userId);
-  } else if (exchangeId === 'coinbase') {
-    await service.deleteCoinbaseKeys(userId);
   } else {
     await service.deleteBinanceKeys(userId);
   }
@@ -217,9 +190,6 @@ export async function executeWithdrawal(exchangeId, address, amount, network = '
   if (exchangeId === 'kraken') {
     // Kraken doesn't use network parameter the same way
     return await service.executeWithdrawal(address, amount, userId);
-  } else if (exchangeId === 'coinbase_advanced' || exchangeId === 'coinbase') {
-    // Coinbase uses 'bitcoin' as network name
-    return await service.executeWithdrawal(address, amount, 'bitcoin', userId);
   } else {
     return await service.executeWithdrawal(address, amount, network, userId);
   }
@@ -239,6 +209,28 @@ export async function executeMarketBuy(exchangeId, fiatAmount, tradingFeePercent
 }
 
 /**
+ * Get trading fees for the specified exchange
+ * @param {string} exchangeId - Exchange identifier
+ * @param {string} userId - User ID for namespaced storage
+ * @returns {Promise<{success: boolean, data: {makerFee: number, takerFee: number}}>}
+ */
+export async function getTradingFees(exchangeId, userId) {
+  const service = getService(exchangeId);
+  if (typeof service.getTradingFees === 'function') {
+    return await service.getTradingFees(userId);
+  }
+  // Fall back to hardcoded fees for exchanges without API support
+  const exchangeInfo = getExchangeInfo(exchangeId);
+  return {
+    success: true,
+    data: {
+      makerFee: exchangeInfo.tradingFee,
+      takerFee: exchangeInfo.tradingFee,
+    }
+  };
+}
+
+/**
  * Get API key setup instructions for an exchange
  */
 export function getApiKeyInstructions(exchangeId) {
@@ -253,17 +245,6 @@ export function getApiKeyInstructions(exchangeId) {
       '7. Enable "Withdraw Funds" ONLY if App Withdrawal Mode is ON',
       '8. Set IP whitelist for additional security (recommended)',
       '9. Note: For withdrawals, you must pre-configure withdrawal addresses in Kraken',
-    ];
-  }
-
-  if (exchangeId === 'coinbase_advanced') {
-    return [
-      '1. Go to portal.cdp.coinbase.com',
-      '2. Create a new project or select existing',
-      '3. Go to API Keys and click "Create API Key"',
-      '4. Copy the "API Key Name" (starts with organizations/...)',
-      '5. Copy the entire "Private Key" (including BEGIN/END lines)',
-      '6. Paste both values in the fields below',
     ];
   }
 
@@ -291,28 +272,6 @@ export function getWithdrawalNotes(exchangeId) {
         'Go to Funding → Withdraw → Bitcoin → Add Address',
         'Add your hardware wallet address and give it a name (e.g., "Hardware Wallet")',
         'Use this exact name when entering your withdrawal address in the app',
-      ],
-    };
-  }
-
-  if (exchangeId === 'coinbase_advanced') {
-    return {
-      title: 'Coinbase Advanced Withdrawal Setup',
-      notes: [
-        'Enter your Bitcoin wallet address directly',
-        'Make sure "Transfer" permission is enabled in your API key settings',
-        'Coinbase may require 2FA verification for withdrawals',
-      ],
-    };
-  }
-
-  if (exchangeId === 'coinbase') {
-    return {
-      title: 'Coinbase Withdrawal Setup',
-      notes: [
-        'Enter your Bitcoin wallet address directly',
-        'Coinbase may have daily withdrawal limits based on your account verification level',
-        'You may need to complete 2FA verification for each withdrawal',
       ],
     };
   }

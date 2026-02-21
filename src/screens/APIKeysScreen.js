@@ -337,19 +337,15 @@ export default function APIKeysScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       ) : (
-        // API key flow for Binance, Kraken, Coinbase
+        // API key flow for Binance, Kraken
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Enter Your {exchangeInfo.name} API Keys</Text>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>
-              {selectedExchangeId === 'coinbase_advanced' ? 'API Key Name' : 'API Key'}
-            </Text>
+            <Text style={styles.label}>API Key</Text>
             <TextInput
               style={styles.input}
-              placeholder={selectedExchangeId === 'coinbase_advanced'
-                ? 'organizations/xxx/apiKeys/xxx'
-                : `Enter your ${exchangeInfo.name} API key`}
+              placeholder={`Enter your ${exchangeInfo.name} API key`}
               placeholderTextColor={colors.textTertiary}
               value={apiKey}
               onChangeText={setApiKey}
@@ -361,21 +357,17 @@ export default function APIKeysScreen({ navigation }) {
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>
-              {selectedExchangeId === 'kraken' || selectedExchangeId === 'coinbase_advanced' ? 'Private Key' : 'API Secret'}
+              {selectedExchangeId === 'kraken' ? 'Private Key' : 'API Secret'}
             </Text>
             <TextInput
-              style={[styles.input, selectedExchangeId === 'coinbase_advanced' && styles.multilineInput]}
-              placeholder={selectedExchangeId === 'coinbase_advanced'
-                ? '-----BEGIN EC PRIVATE KEY-----...'
-                : `Enter your ${exchangeInfo.name} ${selectedExchangeId === 'kraken' ? 'private key' : 'API secret'}`}
+              style={styles.input}
+              placeholder={`Enter your ${exchangeInfo.name} ${selectedExchangeId === 'kraken' ? 'private key' : 'API secret'}`}
               placeholderTextColor={colors.textTertiary}
               value={apiSecret}
               onChangeText={setApiSecret}
               autoCapitalize="none"
               autoCorrect={false}
               secureTextEntry={!showSecrets}
-              multiline={selectedExchangeId === 'coinbase_advanced'}
-              numberOfLines={selectedExchangeId === 'coinbase_advanced' ? 4 : 1}
             />
           </View>
 
@@ -829,7 +821,7 @@ const createStyles = (colors) => StyleSheet.create({
     lineHeight: 20,
   },
   oauthButton: {
-    backgroundColor: '#0052FF', // Coinbase blue
+    backgroundColor: '#0052FF',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

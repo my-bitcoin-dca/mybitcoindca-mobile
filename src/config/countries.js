@@ -235,49 +235,6 @@ const KRAKEN_PROHIBITED = new Set([
   'SY', // Syria
 ]);
 
-// Countries where Coinbase is available
-const COINBASE_COUNTRIES = new Set([
-  // North America
-  'US', // United States
-  'CA', // Canada
-  // Europe - EU/EEA
-  'AT', // Austria
-  'BE', // Belgium
-  'BG', // Bulgaria
-  'HR', // Croatia
-  'CY', // Cyprus
-  'CZ', // Czechia
-  'DK', // Denmark
-  'EE', // Estonia
-  'FI', // Finland
-  'FR', // France
-  'DE', // Germany
-  'GR', // Greece
-  'HU', // Hungary
-  'IE', // Ireland
-  'IT', // Italy
-  'LV', // Latvia
-  'LT', // Lithuania
-  'LU', // Luxembourg
-  'MT', // Malta
-  'NL', // Netherlands
-  'PL', // Poland
-  'PT', // Portugal
-  'RO', // Romania
-  'SK', // Slovakia
-  'SI', // Slovenia
-  'ES', // Spain
-  'SE', // Sweden
-  // UK and other Europe
-  'GB', // United Kingdom
-  'CH', // Switzerland
-  'NO', // Norway
-  // Asia-Pacific
-  'AU', // Australia
-  'NZ', // New Zealand
-  'SG', // Singapore
-]);
-
 // All supported countries with their names
 export const COUNTRIES = [
   { code: 'AL', name: 'Albania' },
@@ -467,13 +424,6 @@ export function isKrakenAvailable(countryCode) {
 }
 
 /**
- * Check if Coinbase is available in a country
- */
-export function isCoinbaseAvailable(countryCode) {
-  return COINBASE_COUNTRIES.has(countryCode);
-}
-
-/**
  * Get available exchanges for a country
  * Returns array of exchange IDs
  */
@@ -486,11 +436,6 @@ export function getAvailableExchanges(countryCode) {
 
   if (isKrakenAvailable(countryCode)) {
     exchanges.push('kraken');
-  }
-
-  if (isCoinbaseAvailable(countryCode)) {
-    exchanges.push('coinbase_advanced');
-    exchanges.push('coinbase');
   }
 
   return exchanges;
