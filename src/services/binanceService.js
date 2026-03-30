@@ -1,4 +1,3 @@
-import Binance from 'binance-api-react-native';
 import CryptoJS from 'crypto-js';
 import storage from '../utils/storage';
 import { getBinancePair } from '../utils/currency';
@@ -71,27 +70,6 @@ function getStorageKey(baseKey, userId) {
 }
 
 /**
- * Get Binance client using keys stored on device
- * These are FULL-ACCESS keys (including withdrawal permissions)
- * They NEVER leave the device
- * @param {string} userId - User ID for namespaced key storage
- */
-export async function getBinanceClient(userId) {
-  const apiKey = await storage.getItem(getStorageKey('binance_api_key', userId));
-  const apiSecret = await storage.getItem(getStorageKey('binance_api_secret', userId));
-
-  if (!apiKey || !apiSecret) {
-    throw new Error('Binance API keys not found. Please configure them first.');
-  }
-
-  return Binance({
-    apiKey,
-    apiSecret,
-    recvWindow: 60000,
-  });
-}
-
-/**
  * Store Binance API keys securely on device
  * @param {string} apiKey - Binance API key
  * @param {string} apiSecret - Binance API secret
@@ -127,7 +105,7 @@ export async function deleteBinanceKeys(userId) {
  * Server never sees the API keys
  *
  * NOTE: Uses direct SAPI call instead of the library's deprecated WAPI endpoint
- * The binance-api-react-native library uses /wapi/v3/withdraw.html which is deprecated
+ * The old WAPI endpoint /wapi/v3/withdraw.html is deprecated
  * New endpoint: /sapi/v1/capital/withdraw/apply
  *
  * @param {string} address - Bitcoin withdrawal address
@@ -165,33 +143,89 @@ export async function executeWithdrawal(address, amount, network = 'BTC', userId
 }
 
 /**
- * Get account balances
+ * Get account balances using direct API call
  * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<Object>} Account info with balances
  */
 export async function getAccountBalances(userId) {
-  const client = await getBinanceClient(userId);
+  const apiKey = await storage.getItem(getStorageKey('binance_api_key', userId));
+  const apiSecret = await storage.getItem(getStorageKey('binance_api_secret', userId));
 
-  try {
-    // Pass useServerTime: true to sync with Binance server time
-    // This prevents "timestamp ahead of server" errors
-    const accountInfo = await client.accountInfo({ useServerTime: true });
-    return {
-      success: true,
-      data: accountInfo.balances.filter(b => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0),
-    };
-  } catch (error) {
-    // Check for JSON parse error (HTML response from Binance)
-    const errorMsg = error.message || error.toString();
-    if (errorMsg.includes('JSON') || errorMsg.includes('unexpected character') || errorMsg.includes('Unexpected token')) {
-      return {
-        success: false,
-        error: 'Binance API is temporarily unavailable. This may be due to: geographic restrictions, rate limiting, or Cloudflare protection. Please try again in a few minutes.',
-      };
-    }
+  if (!apiKey || !apiSecret) {
     return {
       success: false,
-      error: errorMsg,
+      error: 'Binance API keys not found. Please configure them first.',
+    };
+  }
+
+  try {
+    // Use direct API call instead of library for better error handling
+    const timestamp = Date.now();
+    const queryParams = {
+      timestamp,
+      recvWindow: 60000,
+    };
+
+    const queryString = Object.keys(queryParams)
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(queryParams[key])}`)
+      .join('&');
+
+    const signature = CryptoJS.HmacSHA256(queryString, apiSecret).toString(CryptoJS.enc.Hex);
+    const signedQueryString = `${queryString}&signature=${signature}`;
+
+    const url = `${BINANCE_API_URL}/api/v3/account?${signedQueryString}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-MBX-APIKEY': apiKey,
+      },
+    });
+
+    // Log response details for debugging
+    const responseText = await response.text();
+    console.log('[Binance] Account API response status:', response.status);
+    console.log('[Binance] Account API response length:', responseText.length);
+
+    if (!responseText || responseText.length === 0) {
+      console.error('[Binance] Empty response received');
+      return {
+        success: false,
+        error: 'Binance returned an empty response. This usually indicates your IP is blocked or there are network issues. Please check your VPN connection and IP whitelist.',
+      };
+    }
+
+    // Try to parse JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('[Binance] Failed to parse response:', responseText.substring(0, 500));
+      return {
+        success: false,
+        error: `Binance returned invalid response (status ${response.status}). This may indicate IP blocking or API issues.`,
+      };
+    }
+
+    // Check for API error
+    if (data.code && data.code < 0) {
+      console.error('[Binance] API error:', data);
+      return {
+        success: false,
+        error: data.msg || `Binance error code: ${data.code}`,
+      };
+    }
+
+    return {
+      success: true,
+      data: data.balances.filter(b => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0),
+    };
+  } catch (error) {
+    const errorMsg = error.message || error.toString();
+    console.error('[Binance] Connection error:', errorMsg);
+    return {
+      success: false,
+      error: `Connection failed: ${errorMsg}`,
     };
   }
 }
@@ -234,28 +268,44 @@ export async function getWithdrawalFee(userId) {
 }
 
 /**
- * Execute market buy order for BTC
+ * Execute market buy order for BTC using direct API calls
  * Buys BTC using a fixed fiat amount in the specified currency
  *
  * @param {number} fiatAmount - Amount in fiat currency to spend (e.g., 35)
- * @param {number} tradingFeePercent - Trading fee percentage (e.g., 0.1 for 0.1%, 0.2 for 0.2%)
+ * @param {number} _tradingFeePercent - Trading fee percentage (unused - Binance deducts automatically)
  * @param {string} currency - Currency code (e.g., 'EUR', 'USD', 'GBP')
  * @param {string} userId - User ID for namespaced key storage
  * @returns {Promise<Object>} Order result with execution details
  */
-export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, currency = 'EUR', userId) {
-  const client = await getBinanceClient(userId);
+export async function executeMarketBuy(fiatAmount, _tradingFeePercent = 0.1, currency = 'EUR', userId) {
+  const apiKey = await storage.getItem(getStorageKey('binance_api_key', userId));
+  const apiSecret = await storage.getItem(getStorageKey('binance_api_secret', userId));
+
+  if (!apiKey || !apiSecret) {
+    return {
+      success: false,
+      error: 'Binance API keys not found. Please configure them first.',
+    };
+  }
 
   try {
     // Get the Binance trading pair for this currency
     const symbol = getBinancePair(currency);
 
-    // Get current BTC price in the specified currency
-    const ticker = await client.prices({ symbol });
-    const currentPrice = parseFloat(ticker[symbol]);
+    // Get current BTC price (public endpoint)
+    const priceRes = await fetch(`${BINANCE_API_URL}/api/v3/ticker/price?symbol=${symbol}`);
+    const priceData = await priceRes.json();
+    if (priceData.code && priceData.code < 0) {
+      return { success: false, error: priceData.msg || 'Failed to get price' };
+    }
+    const currentPrice = parseFloat(priceData.price);
 
-    // Get symbol info to determine the correct precision for quantity
-    const exchangeInfo = await client.exchangeInfo({ symbol });
+    // Get symbol info (public endpoint)
+    const infoRes = await fetch(`${BINANCE_API_URL}/api/v3/exchangeInfo?symbol=${symbol}`);
+    const exchangeInfo = await infoRes.json();
+    if (exchangeInfo.code && exchangeInfo.code < 0) {
+      return { success: false, error: exchangeInfo.msg || 'Failed to get exchange info' };
+    }
     const symbolInfo = exchangeInfo.symbols.find(s => s.symbol === symbol);
 
     // Find LOT_SIZE filter to get step size (quantity precision)
@@ -278,7 +328,6 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
     const precision = Math.abs(Math.log10(stepSize));
 
     // Calculate BTC quantity to buy
-    // Note: Trading fee is automatically deducted by Binance, we don't subtract it here
     const rawQuantity = fiatAmount / currentPrice;
 
     // Round down to the correct precision
@@ -293,14 +342,43 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
       };
     }
 
-    // Execute market buy order with calculated quantity
-    const order = await client.order({
+    // Execute market buy order (authenticated endpoint)
+    const timestamp = Date.now();
+    const orderParams = {
       symbol,
       side: 'BUY',
       type: 'MARKET',
       quantity: quantity.toFixed(precision),
-      useServerTime: true,
+      timestamp,
+      recvWindow: 60000,
+    };
+
+    const queryString = Object.keys(orderParams)
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(orderParams[key])}`)
+      .join('&');
+
+    const signature = CryptoJS.HmacSHA256(queryString, apiSecret).toString(CryptoJS.enc.Hex);
+    const signedQueryString = `${queryString}&signature=${signature}`;
+
+    const orderRes = await fetch(`${BINANCE_API_URL}/api/v3/order?${signedQueryString}`, {
+      method: 'POST',
+      headers: {
+        'X-MBX-APIKEY': apiKey,
+      },
     });
+
+    const orderText = await orderRes.text();
+    if (!orderText || orderText.length === 0) {
+      return {
+        success: false,
+        error: 'Binance returned an empty response. Please check your network connection and try again.',
+      };
+    }
+
+    const order = JSON.parse(orderText);
+    if (order.code && order.code < 0) {
+      return { success: false, error: order.msg || `Binance error: ${order.code}` };
+    }
 
     // Calculate actual execution details from fills
     let totalBtc = 0;
@@ -345,17 +423,11 @@ export async function executeMarketBuy(fiatAmount, tradingFeePercent = 0.1, curr
       },
     };
   } catch (error) {
-    // Check for JSON parse error (HTML response from Binance)
     const errorMsg = error.message || error.toString();
-    if (errorMsg.includes('JSON') || errorMsg.includes('unexpected character') || errorMsg.includes('Unexpected token')) {
-      return {
-        success: false,
-        error: 'Binance API is temporarily unavailable. This may be due to: geographic restrictions, rate limiting, or Cloudflare protection. Please try again in a few minutes.',
-      };
-    }
+    console.error('[Binance] Market buy error:', errorMsg);
     return {
       success: false,
-      error: errorMsg,
+      error: `Order failed: ${errorMsg}`,
     };
   }
 }
