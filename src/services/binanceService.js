@@ -384,12 +384,18 @@ export async function executeMarketBuy(fiatAmount, _tradingFeePercent = 0.1, cur
     let totalBtc = 0;
     let totalFiat = 0;
     let totalFeesBtc = 0;
+    let feesPaidInBnb = false;
 
     if (order.fills && order.fills.length > 0) {
       order.fills.forEach(fill => {
         totalBtc += parseFloat(fill.qty);
         totalFiat += parseFloat(fill.price) * parseFloat(fill.qty);
-        totalFeesBtc += parseFloat(fill.commission); // Commission in BTC
+        // Only count commission if it's in BTC (not BNB or other assets)
+        if (fill.commissionAsset === 'BTC') {
+          totalFeesBtc += parseFloat(fill.commission);
+        } else if (fill.commissionAsset === 'BNB') {
+          feesPaidInBnb = true;
+        }
       });
     } else {
       // Fallback to order-level data if fills not available
@@ -400,22 +406,27 @@ export async function executeMarketBuy(fiatAmount, _tradingFeePercent = 0.1, cur
     // Calculate average execution price
     const avgPrice = totalFiat / totalBtc;
 
-    // Net BTC after fee deduction (Binance deducts fee from BTC balance)
+    // Net BTC is only reduced if fees were paid in BTC
+    // If fees paid in BNB, totalFeesBtc will be 0 and netBtc = totalBtc (you keep all BTC)
     const netBtc = totalBtc - totalFeesBtc;
 
-    // Convert trading fee from BTC to fiat (for display purposes)
-    const tradingFeeInFiat = totalFeesBtc * avgPrice;
+    // Estimate trading fee in fiat
+    // If paid in BTC, convert to fiat; if paid in BNB, estimate as 0.1% of order
+    const tradingFeeInFiat = feesPaidInBnb
+      ? totalFiat * 0.001  // Estimate ~0.1% fee when paid in BNB
+      : totalFeesBtc * avgPrice;
 
     return {
       success: true,
       data: {
         orderId: order.orderId,
-        btcAmount: netBtc, // Net BTC after fee
+        btcAmount: netBtc, // Net BTC after fee (if fee paid in BTC) or total BTC (if fee paid in BNB)
         fiatSpent: totalFiat,
         currency: currency,
         avgPrice: avgPrice,
-        tradingFee: tradingFeeInFiat, // Fee in fiat (for backward compatibility)
-        tradingFeeBtc: totalFeesBtc, // Fee in BTC (actual amount deducted)
+        tradingFee: tradingFeeInFiat, // Estimated fee in fiat
+        tradingFeeBtc: totalFeesBtc, // Fee in BTC (0 if paid in BNB)
+        feesPaidInBnb: feesPaidInBnb, // True if fees were paid using BNB
         timestamp: new Date(order.transactTime).toISOString(),
         fills: order.fills,
         // Keep eurSpent for backward compatibility with older mobile app versions
