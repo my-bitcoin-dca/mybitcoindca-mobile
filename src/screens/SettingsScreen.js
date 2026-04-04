@@ -64,6 +64,7 @@ export default function SettingsScreen({ navigation }) {
   const [selectedFrequency, setSelectedFrequency] = useState('weekly');
   const [selectedDay, setSelectedDay] = useState('thursday');
   const [selectedHour, setSelectedHour] = useState(8);
+  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London');
 
   // Notification preferences
   const [anomalyAlerts, setAnomalyAlerts] = useState(true);
@@ -126,6 +127,9 @@ export default function SettingsScreen({ navigation }) {
         setSelectedFrequency(settings.purchaseSchedule?.frequency || 'weekly');
         setSelectedDay(settings.purchaseSchedule?.dayOfWeek || 'thursday');
         setSelectedHour(settings.purchaseSchedule?.hour ?? 8);
+        // Use saved timezone or detect from device
+        const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
+        setTimezone(settings.purchaseSchedule?.timezone || deviceTimezone);
 
         // Load notification preferences
         setAnomalyAlerts(settings.notifications?.anomalyAlerts ?? true);
@@ -182,17 +186,20 @@ export default function SettingsScreen({ navigation }) {
 
   const handleFrequencyChange = async (value) => {
     setSelectedFrequency(value);
-    await saveSettings({ purchaseSchedule: { frequency: value, dayOfWeek: selectedDay, hour: selectedHour } });
+    await saveSettings({ purchaseSchedule: { frequency: value, dayOfWeek: selectedDay, hour: selectedHour, timezone } });
   };
 
   const handleDayChange = async (value) => {
     setSelectedDay(value);
-    await saveSettings({ purchaseSchedule: { frequency: selectedFrequency, dayOfWeek: value, hour: selectedHour } });
+    await saveSettings({ purchaseSchedule: { frequency: selectedFrequency, dayOfWeek: value, hour: selectedHour, timezone } });
   };
 
   const handleHourChange = async (value) => {
     setSelectedHour(value);
-    await saveSettings({ purchaseSchedule: { frequency: selectedFrequency, dayOfWeek: selectedDay, hour: value } });
+    // Also update timezone in case device timezone changed
+    const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
+    setTimezone(currentTimezone);
+    await saveSettings({ purchaseSchedule: { frequency: selectedFrequency, dayOfWeek: selectedDay, hour: value, timezone: currentTimezone } });
   };
 
   const handleAnomalyAlertsChange = async (value) => {
@@ -656,7 +663,7 @@ export default function SettingsScreen({ navigation }) {
 
          <View style={styles.infoBox}>
           <Text style={styles.infoText}>
-            ⓘ Your purchase schedule is in server time (UTC). You'll receive a notification to execute the trade at the scheduled time.
+            ⓘ Your purchase schedule uses your device timezone ({timezone}). You'll receive a notification to execute the trade at the scheduled time.
           </Text>
         </View>
 
