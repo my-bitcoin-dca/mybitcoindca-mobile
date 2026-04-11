@@ -13,8 +13,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { hasExchangeKeys, getSelectedExchange } from '../services/exchangeService';
 import { useFocusEffect } from '@react-navigation/native';
-import { surveyAPI } from '../services/api';
+import { dcaAPI, surveyAPI } from '../services/api';
 import SurveyModal from '../components/SurveyModal';
+
+const getCurrencySymbol = (currencyCode) => {
+  const symbols = {
+    'EUR': '\u20ac', 'USD': '$', 'GBP': '\u00a3', 'AUD': 'A$', 'BRL': 'R$', 'TRY': '\u20ba',
+  };
+  return symbols[currencyCode] || currencyCode;
+};
 
 export default function HomeScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -22,11 +29,13 @@ export default function HomeScreen({ navigation }) {
   const [hasKeys, setHasKeys] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
+  const [pendingTrade, setPendingTrade] = useState(null);
   const surveyChecked = useRef(false);
 
   useEffect(() => {
     checkSetup();
     checkSurvey();
+    checkPendingTrade();
   }, []);
 
   const checkSurvey = async () => {
@@ -47,10 +56,24 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  // Re-check setup when screen comes into focus
+  const checkPendingTrade = async () => {
+    try {
+      const response = await dcaAPI.getPendingTrade();
+      if (response.success && response.pending) {
+        setPendingTrade(response.tradeData);
+      } else {
+        setPendingTrade(null);
+      }
+    } catch (error) {
+      // Silently fail - pending trade check is non-critical
+    }
+  };
+
+  // Re-check setup and pending trade when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       checkSetup();
+      checkPendingTrade();
     }, [])
   );
 
@@ -63,7 +86,7 @@ export default function HomeScreen({ navigation }) {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await checkSetup();
+    await Promise.all([checkSetup(), checkPendingTrade()]);
     setRefreshing(false);
   };
 
@@ -112,6 +135,23 @@ export default function HomeScreen({ navigation }) {
             </Text>
           </View>
         </View>
+      )}
+
+      {pendingTrade && (
+        <TouchableOpacity
+          style={styles.pendingTradeCard}
+          onPress={() => navigation.navigate('TradeExecution', { tradeData: pendingTrade })}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="cart" size={32} color={colors.background} style={styles.pendingTradeIcon} />
+          <View style={styles.pendingTradeTextContainer}>
+            <Text style={styles.pendingTradeTitle}>DCA Purchase Ready</Text>
+            <Text style={styles.pendingTradeText}>
+              Tap to execute your {getCurrencySymbol(pendingTrade.currency)}{pendingTrade.fiatAmount} BTC purchase
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={colors.background} />
+        </TouchableOpacity>
       )}
 
       <View style={styles.infoCard}>
@@ -193,6 +233,32 @@ const createStyles = (colors) => StyleSheet.create({
     color: colors.error,
     fontSize: 16,
     fontWeight: '600',
+  },
+  pendingTradeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    margin: 20,
+    marginBottom: 0,
+    padding: 16,
+    borderRadius: 12,
+  },
+  pendingTradeIcon: {
+    marginRight: 12,
+  },
+  pendingTradeTextContainer: {
+    flex: 1,
+  },
+  pendingTradeTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.background,
+    marginBottom: 2,
+  },
+  pendingTradeText: {
+    fontSize: 14,
+    color: colors.background,
+    opacity: 0.9,
   },
   setupCard: {
     flexDirection: 'row',

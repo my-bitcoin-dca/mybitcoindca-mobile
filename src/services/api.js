@@ -269,6 +269,11 @@ export const dcaAPI = {
     return response.data;
   },
 
+  getPendingTrade: async () => {
+    const response = await api.get('/pending-trade');
+    return response.data;
+  },
+
   reportTradeExecution: async (tradeData) => {
     const response = await api.post('/report-trade-execution', tradeData);
     return response.data;

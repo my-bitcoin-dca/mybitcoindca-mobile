@@ -81,8 +81,6 @@ export default function TransactionsScreen() {
     const cost = item.fiatCost !== undefined ? item.fiatCost : (item.eurCost || 0);
     const price = item.fiatPrice !== undefined ? item.fiatPrice : (item.eurPrice || 0);
     const currencySymbol = getCurrencySymbol(item.currency || 'EUR');
-    const netCost = cost - (item.tradingFee || 0);
-
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
@@ -98,7 +96,7 @@ export default function TransactionsScreen() {
           </View>
           <View>
             <Text style={styles.label}>Cost</Text>
-            <Text style={styles.value}>{currencySymbol}{netCost.toFixed(2)}</Text>
+            <Text style={styles.value}>{currencySymbol}{cost.toFixed(2)}</Text>
           </View>
           <View>
             <Text style={styles.label}>Price</Text>
