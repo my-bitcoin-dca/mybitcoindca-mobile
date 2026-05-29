@@ -274,6 +274,11 @@ export const dcaAPI = {
     return response.data;
   },
 
+  getWithdrawalStatus: async () => {
+    const response = await api.get('/withdrawal-status');
+    return response.data;
+  },
+
   reportTradeExecution: async (tradeData) => {
     const response = await api.post('/report-trade-execution', tradeData);
     return response.data;

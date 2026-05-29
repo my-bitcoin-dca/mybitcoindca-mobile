@@ -30,12 +30,14 @@ export default function HomeScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
   const [pendingTrade, setPendingTrade] = useState(null);
+  const [pendingWithdrawal, setPendingWithdrawal] = useState(null);
   const surveyChecked = useRef(false);
 
   useEffect(() => {
     checkSetup();
     checkSurvey();
     checkPendingTrade();
+    checkPendingWithdrawal();
   }, []);
 
   const checkSurvey = async () => {
@@ -69,11 +71,34 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const checkPendingWithdrawal = async () => {
+    try {
+      const response = await dcaAPI.getWithdrawalStatus();
+      const windowOpen = response?.success && response.withdrawalWindow?.isOpen;
+      const notSkipped = !response?.withdrawalWindow?.isSkipped;
+      const hasBalance = (response?.unwithdrawnBalance?.btc || 0) > 0;
+      const hasAddress = !!response?.walletAddress;
+      if (windowOpen && notSkipped && hasBalance && hasAddress) {
+        setPendingWithdrawal({
+          btcAmount: response.unwithdrawnBalance.btc,
+          eurAmount: response.unwithdrawnBalance.fiat,
+          address: response.walletAddress,
+          appWithdrawal: response.appWithdrawal,
+        });
+      } else {
+        setPendingWithdrawal(null);
+      }
+    } catch (error) {
+      // Silently fail - pending withdrawal check is non-critical
+    }
+  };
+
   // Re-check setup and pending trade when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       checkSetup();
       checkPendingTrade();
+      checkPendingWithdrawal();
     }, [])
   );
 
@@ -86,7 +111,7 @@ export default function HomeScreen({ navigation }) {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([checkSetup(), checkPendingTrade()]);
+    await Promise.all([checkSetup(), checkPendingTrade(), checkPendingWithdrawal()]);
     setRefreshing(false);
   };
 
@@ -148,6 +173,23 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.pendingTradeTitle}>DCA Purchase Ready</Text>
             <Text style={styles.pendingTradeText}>
               Tap to execute your {getCurrencySymbol(pendingTrade.currency)}{pendingTrade.fiatAmount} BTC purchase
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={colors.background} />
+        </TouchableOpacity>
+      )}
+
+      {pendingWithdrawal && (
+        <TouchableOpacity
+          style={styles.pendingTradeCard}
+          onPress={() => navigation.navigate('WithdrawalApproval', { withdrawalData: pendingWithdrawal })}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="arrow-up-circle" size={32} color={colors.background} style={styles.pendingTradeIcon} />
+          <View style={styles.pendingTradeTextContainer}>
+            <Text style={styles.pendingTradeTitle}>Withdrawal Ready</Text>
+            <Text style={styles.pendingTradeText}>
+              Tap to withdraw {pendingWithdrawal.btcAmount} BTC to your hardware wallet
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={24} color={colors.background} />
