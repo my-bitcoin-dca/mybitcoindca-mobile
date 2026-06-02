@@ -6,11 +6,9 @@ export const SUPPORTED_CURRENCIES = [
   { code: 'GBP', symbol: '£', name: 'British Pound', binancePair: 'BTCGBP', krakenPair: 'XBTGBP' },
   { code: 'USDT', symbol: '₮', name: 'Tether', binancePair: 'BTCUSDT', krakenPair: 'XBTUSDT' },
   { code: 'USDC', symbol: 'USDC', name: 'USD Coin', binancePair: 'BTCUSDC', krakenPair: 'XBTUSDC' },
-  { code: 'BUSD', symbol: 'BUSD', name: 'Binance USD', binancePair: 'BTCBUSD', krakenPair: null }, // Not on Kraken
   { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', binancePair: 'BTCAUD', krakenPair: 'XBTAUD' },
   { code: 'BRL', symbol: 'R$', name: 'Brazilian Real', binancePair: 'BTCBRL', krakenPair: null }, // Not on Kraken
   { code: 'TRY', symbol: '₺', name: 'Turkish Lira', binancePair: 'BTCTRY', krakenPair: null }, // Not on Kraken
-  { code: 'TUSD', symbol: 'TUSD', name: 'TrueUSD', binancePair: 'BTCTUSD', krakenPair: null }, // Not on Kraken
   { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', binancePair: null, krakenPair: 'XBTCAD' },
   { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc', binancePair: null, krakenPair: 'XBTCHF' },
   { code: 'JPY', symbol: '¥', name: 'Japanese Yen', binancePair: null, krakenPair: 'XBTJPY' },
