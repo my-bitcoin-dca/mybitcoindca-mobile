@@ -670,17 +670,17 @@ export default function SettingsScreen({ navigation }) {
         <Text style={styles.sectionTitle}>Push Notifications</Text>
 
         {/* Anomaly Alerts */}
-        <View style={[styles.inputGroup, !hasActiveSubscription && styles.disabledInputGroup]}>
+        <View style={styles.inputGroup}>
           <View style={styles.settingRow}>
             <View style={styles.settingLeft}>
               <Ionicons
                 name="notifications"
                 size={24}
-                color={hasActiveSubscription ? colors.secondary : colors.textTertiary}
+                color={colors.secondary}
                 style={styles.settingIcon}
               />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.label, !hasActiveSubscription && styles.disabledLabel]}>Anomaly Alerts (Beta)</Text>
+                <Text style={styles.label}>Anomaly Alerts (Beta)</Text>
                 <Text style={styles.description}>
                   Get notified when unusual market conditions present buying opportunities
                 </Text>
@@ -691,7 +691,6 @@ export default function SettingsScreen({ navigation }) {
               onValueChange={handleAnomalyAlertsChange}
               trackColor={{ false: colors.border, true: colors.secondary }}
               thumbColor="#fff"
-              disabled={!hasActiveSubscription}
             />
           </View>
         </View>

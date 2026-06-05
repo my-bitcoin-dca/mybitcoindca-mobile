@@ -33,6 +33,9 @@ export default function TradeExecutionScreen({ route, navigation }) {
   const [exchange, setExchange] = useState('binance');
   const [fiatAmount, setFiatAmount] = useState(tradeData?.fiatAmount || tradeData?.eurAmount || 100);
   const [amountInput, setAmountInput] = useState('');
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(true);
+
+  const isLockedAnomaly = isAnomalyPurchase && !hasActiveSubscription;
 
   useEffect(() => {
     // Load trading fee and estimate purchase
@@ -41,10 +44,15 @@ export default function TradeExecutionScreen({ route, navigation }) {
 
   const loadTradingFee = async () => {
     try {
-      const [response, selectedExchange] = await Promise.all([
+      const [response, selectedExchange, subscriptionResponse] = await Promise.all([
         authAPI.getSettings(),
         getSelectedExchange(userId),
+        authAPI.getSubscriptionStatus(),
       ]);
+
+      if (subscriptionResponse?.success) {
+        setHasActiveSubscription(subscriptionResponse.data.hasActiveSubscription || false);
+      }
 
       const userExchange = response.success ? (response.data.settings.exchange || selectedExchange) : selectedExchange;
       setExchange(userExchange);
@@ -267,6 +275,32 @@ export default function TradeExecutionScreen({ route, navigation }) {
           </View>
         )}
 
+        {isLockedAnomaly && (
+          <>
+            <View style={styles.note}>
+              <Text style={styles.noteText}>
+                Subscribe to act on opportunities like this directly from the app.
+              </Text>
+            </View>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.button, styles.executeButton]}
+                onPress={() => navigation.navigate('Settings')}
+              >
+                <Text style={styles.buttonText}>Subscribe</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.skipButton]}
+                onPress={() => navigation.goBack()}
+              >
+                <Text style={[styles.buttonText, styles.skipButtonText]}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {!isLockedAnomaly && (
+        <>
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Exchange:</Text>
@@ -347,6 +381,8 @@ export default function TradeExecutionScreen({ route, navigation }) {
             <Text style={[styles.buttonText, styles.skipButtonText]}>Skip</Text>
           </TouchableOpacity>
         </View>
+        </>
+        )}
       </View>
     </ScrollView>
   );
