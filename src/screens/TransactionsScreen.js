@@ -81,10 +81,11 @@ export default function TransactionsScreen() {
     const cost = item.fiatCost !== undefined ? item.fiatCost : (item.eurCost || 0);
     const price = item.fiatPrice !== undefined ? item.fiatPrice : (item.eurPrice || 0);
     const currencySymbol = getCurrencySymbol(item.currency || 'EUR');
+    const title = item.purchaseType === 'lump_sum' ? 'Lump-Sum Buy' : 'DCA Purchase';
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardType}>DCA Purchase</Text>
+          <Text style={styles.cardType}>{title}</Text>
           <Text style={styles.cardDate}>
             {new Date(item.purchaseDate).toLocaleDateString()}
           </Text>

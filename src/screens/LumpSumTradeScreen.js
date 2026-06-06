@@ -141,8 +141,9 @@ export default function LumpSumTradeScreen({ navigation }) {
         return;
       }
 
+      let reportError = null;
       try {
-        await dcaAPI.reportTradeExecution({
+        const reportResult = await dcaAPI.reportTradeExecution({
           orderId: result.data.orderId,
           btcAmount: result.data.btcAmount,
           fiatSpent: result.data.fiatSpent,
@@ -154,19 +155,34 @@ export default function LumpSumTradeScreen({ navigation }) {
           exchange,
           purchaseType: 'lump_sum',
         });
-      } catch (reportError) {
-        // Trade succeeded on the exchange; reporting can be reconciled later.
+        if (reportResult && reportResult.success === false) {
+          reportError = reportResult.message || 'Server rejected the trade report.';
+        }
+      } catch (err) {
+        const serverMsg = err?.response?.data?.message;
+        reportError = serverMsg || err?.message || 'Failed to record purchase on server.';
+        console.error('[LumpSum] reportTradeExecution failed:', err?.response?.data || err);
       }
 
       const currencySymbol = getCurrencySymbol(currency);
-      Alert.alert(
-        'Success',
-        `Lump-sum buy executed.\n\n` +
-          `BTC Purchased: ${result.data.btcAmount.toFixed(8)}\n` +
-          `${currency} Spent: ${currencySymbol}${result.data.fiatSpent.toFixed(2)}\n` +
-          `Avg Price: ${currencySymbol}${result.data.avgPrice.toFixed(2)}`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      const summary =
+        `BTC Purchased: ${result.data.btcAmount.toFixed(8)}\n` +
+        `${currency} Spent: ${currencySymbol}${result.data.fiatSpent.toFixed(2)}\n` +
+        `Avg Price: ${currencySymbol}${result.data.avgPrice.toFixed(2)}`;
+
+      if (reportError) {
+        Alert.alert(
+          'Trade Executed — Record Failed',
+          `Your Binance order ${result.data.orderId} went through, but recording it on the server failed:\n\n${reportError}\n\n${summary}`,
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } else {
+        Alert.alert(
+          'Success',
+          `Lump-sum buy executed.\n\n${summary}`,
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      }
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to execute trade.');
     } finally {
