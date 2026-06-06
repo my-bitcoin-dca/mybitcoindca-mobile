@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { hasExchangeKeys, getSelectedExchange } from '../services/exchangeService';
 import { useFocusEffect } from '@react-navigation/native';
-import { dcaAPI, surveyAPI } from '../services/api';
+import { dcaAPI, surveyAPI, authAPI } from '../services/api';
 import SurveyModal from '../components/SurveyModal';
 
 const getCurrencySymbol = (currencyCode) => {
@@ -27,6 +27,7 @@ export default function HomeScreen({ navigation }) {
   const { user, logout } = useAuth();
   const { colors } = useTheme();
   const [hasKeys, setHasKeys] = useState(false);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
   const [pendingTrade, setPendingTrade] = useState(null);
@@ -35,6 +36,7 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     checkSetup();
+    checkSubscription();
     checkSurvey();
     checkPendingTrade();
     checkPendingWithdrawal();
@@ -97,6 +99,7 @@ export default function HomeScreen({ navigation }) {
   useFocusEffect(
     React.useCallback(() => {
       checkSetup();
+      checkSubscription();
       checkPendingTrade();
       checkPendingWithdrawal();
     }, [])
@@ -109,9 +112,46 @@ export default function HomeScreen({ navigation }) {
     setHasKeys(keys);
   };
 
+  const checkSubscription = async () => {
+    try {
+      const response = await authAPI.getSubscriptionStatus();
+      if (response?.success) {
+        setHasActiveSubscription(response.data.hasActiveSubscription || false);
+      }
+    } catch (error) {
+      // Non-critical; leave existing value
+    }
+  };
+
+  const handleLumpSum = () => {
+    if (!hasKeys) {
+      Alert.alert(
+        'Setup Required',
+        'Configure your exchange API keys first to enable trading.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Set Up', onPress: () => navigation.navigate('APIKeys') },
+        ]
+      );
+      return;
+    }
+    if (!hasActiveSubscription) {
+      Alert.alert(
+        'Subscription Required',
+        'Lump-sum trades are a subscriber feature. Subscribe to enable one-off buys directly from the app.',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Subscribe', onPress: () => navigation.navigate('Settings') },
+        ]
+      );
+      return;
+    }
+    navigation.navigate('LumpSumTrade');
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([checkSetup(), checkPendingTrade(), checkPendingWithdrawal()]);
+    await Promise.all([checkSetup(), checkSubscription(), checkPendingTrade(), checkPendingWithdrawal()]);
     setRefreshing(false);
   };
 
@@ -195,6 +235,21 @@ export default function HomeScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={24} color={colors.background} />
         </TouchableOpacity>
       )}
+
+      <TouchableOpacity
+        style={styles.lumpSumCard}
+        onPress={handleLumpSum}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="flash" size={28} color={colors.primary} style={styles.lumpSumIcon} />
+        <View style={styles.lumpSumTextContainer}>
+          <Text style={styles.lumpSumTitle}>Lump-Sum Buy</Text>
+          <Text style={styles.lumpSumText}>
+            Execute a one-off Bitcoin purchase, separate from your scheduled DCA.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+      </TouchableOpacity>
 
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>How It Works</Text>
@@ -301,6 +356,33 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 14,
     color: colors.background,
     opacity: 0.9,
+  },
+  lumpSumCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardBackground,
+    marginHorizontal: 20,
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  lumpSumIcon: {
+    marginRight: 12,
+  },
+  lumpSumTextContainer: {
+    flex: 1,
+  },
+  lumpSumTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  lumpSumText: {
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   setupCard: {
     flexDirection: 'row',

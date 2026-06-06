@@ -21,6 +21,7 @@ import HomeScreen from '../screens/HomeScreen';
 import APIKeysScreen from '../screens/APIKeysScreen';
 import WithdrawalApprovalScreen from '../screens/WithdrawalApprovalScreen';
 import TradeExecutionScreen from '../screens/TradeExecutionScreen';
+import LumpSumTradeScreen from '../screens/LumpSumTradeScreen';
 import TransactionsScreen from '../screens/TransactionsScreen';
 import AwardsScreen from '../screens/AwardsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -341,6 +342,21 @@ const AppNavigator = forwardRef(({ pendingNotification, onNotificationHandled },
               component={TradeExecutionScreen}
               options={{
                 title: 'Execute DCA Purchase',
+                headerShown: true,
+                presentation: 'modal',
+                headerStyle: {
+                  backgroundColor: colors.cardBackground,
+                },
+                headerTitleStyle: {
+                  color: colors.text,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="LumpSumTrade"
+              component={LumpSumTradeScreen}
+              options={{
+                title: 'Lump-Sum Buy',
                 headerShown: true,
                 presentation: 'modal',
                 headerStyle: {
